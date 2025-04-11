@@ -134,7 +134,7 @@ const LandingSection = ({ onGetStarted }: LandingSectionProps) => {
                 </motion.button>
                 
                 <motion.a
-                  href="https://quiznect-genius.lovable.app/"
+                  href="https://learnflowai-barrack.netlify.app/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="secondary-button flex items-center"
