@@ -15,6 +15,7 @@ interface QuizOption {
 interface QuizQuestion {
   question: string;
   options: QuizOption[];
+  type?: 'multiple-choice' | 'assertion-reason' | 'true-false';
 }
 
 interface QuizData {
@@ -128,6 +129,7 @@ const QuizDisplay = ({ quiz, onReset, username, onScoreSubmit, creatorName }: Qu
       return {
         questionNumber: qIndex + 1,
         question: q.question,
+        questionType: q.type || 'multiple-choice',
         userAnswer: selectedOption !== undefined ? q.options[selectedOption]?.text || "Not answered" : "Not answered",
         correctAnswer: q.options.find(opt => opt.correct)?.text || "",
         isCorrect,
@@ -154,6 +156,18 @@ const QuizDisplay = ({ quiz, onReset, username, onScoreSubmit, creatorName }: Qu
       return quiz.questions[0].question;
     }
     return '';
+  };
+
+  const getQuestionTypeLabel = (type?: string) => {
+    switch (type) {
+      case 'assertion-reason':
+        return <span className="text-indigo-600 text-xs font-semibold bg-indigo-50 px-2 py-1 rounded-full mr-2">Assertion-Reason</span>;
+      case 'true-false':
+        return <span className="text-green-600 text-xs font-semibold bg-green-50 px-2 py-1 rounded-full mr-2">True-False</span>;
+      case 'multiple-choice':
+      default:
+        return <span className="text-blue-600 text-xs font-semibold bg-blue-50 px-2 py-1 rounded-full mr-2">Multiple-Choice</span>;
+    }
   };
 
   const isExternalQuiz = username && creatorName && username !== creatorName;
@@ -241,99 +255,88 @@ const QuizDisplay = ({ quiz, onReset, username, onScoreSubmit, creatorName }: Qu
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, delay: qIndex * 0.1 }}
                 >
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                    {qIndex + 1}. {question.question}
+                  <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                    {getQuestionTypeLabel(question.type)}
+                    <span>{qIndex + 1}. {question.question}</span>
                   </h3>
                   
                   <div className="space-y-3 mb-3">
                     {question.options.map((option, oIndex) => (
                       <motion.div 
                         key={oIndex}
-                        whileHover={score === null ? { scale: 1.01 } : {}}
-                        whileTap={score === null ? { scale: 0.99 } : {}}
+                        className={cn(
+                          "p-3 border rounded-lg cursor-pointer transition-all",
+                          selectedAnswers[qIndex] === oIndex && score === null 
+                            ? "border-quiz-primary bg-blue-50" 
+                            : "border-gray-200 hover:border-quiz-primary",
+                          score !== null && option.correct && "border-green-500 bg-green-50",
+                          score !== null && selectedAnswers[qIndex] === oIndex && !option.correct && "border-red-500 bg-red-50"
+                        )}
+                        onClick={() => handleAnswerSelect(qIndex, oIndex)}
+                        whileHover={{ scale: score === null ? 1.01 : 1 }}
+                        whileTap={{ scale: score === null ? 0.99 : 1 }}
                       >
-                        <button
-                          onClick={() => handleAnswerSelect(qIndex, oIndex)}
-                          className={cn(
-                            "w-full text-left p-3 sm:p-4 rounded-lg transition-all duration-200 border",
-                            score === null ? "hover:bg-gray-100 cursor-pointer" : "cursor-default",
-                            selectedAnswers[qIndex] === oIndex 
-                              ? (score !== null && !option.correct
-                                  ? "bg-red-50 border-red-300" 
-                                  : "bg-blue-50 border-blue-300")
-                              : (score !== null && option.correct
-                                  ? "bg-green-50 border-green-300"
-                                  : "bg-white border-gray-200")
-                          )}
-                          disabled={score !== null}
-                        >
-                          <div className="flex items-center">
-                            <div className={cn(
-                              "w-5 h-5 rounded-full mr-3 flex-shrink-0 flex items-center justify-center border",
-                              selectedAnswers[qIndex] === oIndex 
-                                ? (score !== null && !option.correct
-                                    ? "border-red-500 bg-red-100" 
-                                    : "border-blue-500 bg-blue-100")
-                                : (score !== null && option.correct
-                                    ? "border-green-500 bg-green-100"
-                                    : "border-gray-300 bg-white")
-                            )}>
-                              {score !== null && option.correct && (
-                                <svg className="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                </svg>
-                              )}
-                              {score !== null && selectedAnswers[qIndex] === oIndex && !option.correct && (
-                                <svg className="w-3 h-3 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                </svg>
-                              )}
-                            </div>
-                            <span className="break-words">{option.text}</span>
+                        <div className="flex items-start gap-3">
+                          <div className={cn(
+                            "h-6 w-6 rounded-full flex items-center justify-center flex-shrink-0 border",
+                            selectedAnswers[qIndex] === oIndex && score === null 
+                              ? "border-quiz-primary bg-quiz-primary text-white" 
+                              : "border-gray-300",
+                            score !== null && option.correct && "border-green-500 bg-green-500 text-white",
+                            score !== null && selectedAnswers[qIndex] === oIndex && !option.correct && "border-red-500 bg-red-500 text-white"
+                          )}>
+                            {selectedAnswers[qIndex] === oIndex && score === null && <Check size={14} />}
+                            {score !== null && option.correct && <Check size={14} />}
+                            {score !== null && selectedAnswers[qIndex] === oIndex && !option.correct && <AlertTriangle size={14} />}
                           </div>
-                        </button>
+                          
+                          <div>
+                            <p className={cn(
+                              "text-gray-800",
+                              score !== null && option.correct && "font-medium text-green-700",
+                              score !== null && selectedAnswers[qIndex] === oIndex && !option.correct && "font-medium text-red-700"
+                            )}>
+                              {option.text}
+                            </p>
+                            
+                            {score !== null && selectedAnswers[qIndex] === oIndex && option.correct && (
+                              <div className="mt-2 text-sm text-green-700 flex items-center">
+                                <Check size={14} className="mr-1" /> Correct!
+                              </div>
+                            )}
+                            
+                            {score !== null && selectedAnswers[qIndex] === oIndex && !option.correct && (
+                              <div className="mt-2 text-sm text-red-700 flex items-center">
+                                <AlertTriangle size={14} className="mr-1" /> Incorrect
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </motion.div>
                     ))}
                   </div>
                   
                   {score !== null && (
                     <div className="mt-4">
-                      {selectedAnswers[qIndex] !== undefined && 
-                       !quiz.questions[qIndex].options[selectedAnswers[qIndex]].correct && (
-                        <div className="mb-2 flex items-start gap-2 p-3 bg-red-50 rounded-lg border border-red-100">
-                          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="font-medium text-red-700">Your answer was incorrect</p>
-                            <p className="text-sm text-red-600">
-                              The correct answer is: {quiz.questions[qIndex].options.find(opt => opt.correct)?.text}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                      
-                      <button
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => toggleExplanation(qIndex)}
-                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                        className="text-sm"
                       >
-                        {showExplanation[qIndex] ? "Hide Explanation" : "Show Explanation"}
-                      </button>
+                        {showExplanation[qIndex] ? 'Hide Explanation' : 'Show Explanation'}
+                      </Button>
                       
                       <AnimatePresence>
                         {showExplanation[qIndex] && (
                           <motion.div 
+                            className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-gray-700"
                             initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
+                            animate={{ opacity: 1, height: 'auto' }}
                             exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.3 }}
-                            className="overflow-hidden"
+                            transition={{ duration: 0.2 }}
                           >
-                            <div className="mt-3 p-4 bg-green-50 rounded-lg text-sm text-green-800 border border-green-100">
-                              <p className="font-semibold mb-1">Explanation:</p>
-                              <p className="break-words">
-                                {quiz.questions[qIndex].options.find(opt => opt.correct)?.explanation || 
-                                "No explanation provided for this question."}
-                              </p>
-                            </div>
+                            {question.options.find(opt => opt.correct)?.explanation || "No explanation available."}
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -343,104 +346,90 @@ const QuizDisplay = ({ quiz, onReset, username, onScoreSubmit, creatorName }: Qu
               ))}
             </div>
             
-            {score === null ? (
-              <motion.button
-                onClick={submitQuiz}
-                className={cn(
-                  "w-full bg-gradient-to-r from-primary to-secondary text-white font-medium py-4 px-6 rounded-xl mt-8",
-                  Object.keys(selectedAnswers).length < quiz.questions.length ? "opacity-70" : ""
-                )}
-                whileHover={Object.keys(selectedAnswers).length === quiz.questions.length ? { scale: 1.02 } : {}}
-                whileTap={Object.keys(selectedAnswers).length === quiz.questions.length ? { scale: 0.98 } : {}}
-                disabled={Object.keys(selectedAnswers).length < quiz.questions.length}
-              >
-                {Object.keys(selectedAnswers).length < quiz.questions.length 
-                  ? `Answer all questions (${Object.keys(selectedAnswers).length}/${quiz.questions.length})` 
-                  : "Submit Assessment"}
-              </motion.button>
-            ) : (
-              <motion.div 
-                className="mt-8"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5 }}
-              >
-                <div className="bg-gradient-to-r from-primary to-secondary p-4 sm:p-8 rounded-2xl text-white text-center">
-                  <div className="mb-2">
-                    <Trophy className="w-12 h-12 sm:w-14 sm:h-14 mx-auto" />
-                  </div>
-                  <h3 className="text-xl sm:text-3xl font-bold mb-2">
-                    Your Score: {score} out of {quiz.questions.length}
-                  </h3>
-                  <p className="text-white/90 mb-6">
-                    {getScoreMessage()}
-                  </p>
+            <div className="mt-8">
+              {score === null ? (
+                <div className="flex flex-col md:flex-row gap-4 mt-6">
+                  <Button 
+                    className="premium-button flex-1 py-6"
+                    onClick={submitQuiz}
+                    disabled={Object.keys(selectedAnswers).length < quiz.questions.length}
+                  >
+                    Submit Quiz
+                  </Button>
                   
-                  {earnedLearnPoint && (
-                    <div className="mb-6 p-3 bg-amber-500/20 backdrop-blur-sm rounded-lg text-white inline-flex items-center">
-                      <Star className="text-amber-300 mr-2 h-5 w-5" />
-                      <span>You earned 1 Learn Point for completing this external assessment!</span>
-                    </div>
-                  )}
-                  
-                  <div className="flex flex-wrap justify-center gap-4">
-                    <button
-                      onClick={resetQuiz}
-                      className="bg-white text-primary px-4 sm:px-6 py-2 sm:py-3 rounded-full font-medium 
-                              hover:bg-blue-50 transition-colors duration-200"
-                    >
-                      Try Again
-                    </button>
-                    <button
-                      onClick={() => setShowMasterChat(true)}
-                      className="bg-white/20 backdrop-blur-sm text-white px-4 sm:px-6 py-2 sm:py-3 rounded-full font-medium 
-                              hover:bg-white/30 transition-colors duration-200"
-                    >
-                      Ask Master Teacher
-                    </button>
-                    <button
-                      onClick={onReset}
-                      className="bg-white/20 backdrop-blur-sm text-white px-4 sm:px-6 py-2 sm:py-3 rounded-full font-medium 
-                              hover:bg-white/30 transition-colors duration-200"
-                    >
-                      New Assessment
-                    </button>
-                    {!scoreSubmitted && username && (
-                      <Button
-                        onClick={handleSubmitScore}
-                        className="bg-white/20 backdrop-blur-sm text-white px-4 sm:px-6 py-2 sm:py-3 rounded-full font-medium 
-                                  hover:bg-white/30 transition-colors duration-200 flex items-center gap-2"
-                      >
-                        <Award className="w-4 h-4" />
-                        Save Score
-                      </Button>
-                    )}
-                    {scoreSubmitted && (
-                      <Button
-                        className="bg-green-500 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-full font-medium flex items-center gap-2"
-                        disabled
-                      >
-                        <Check className="w-4 h-4" />
-                        Score Saved
-                      </Button>
-                    )}
-                  </div>
+                  <Button
+                    variant="outline"
+                    className="flex-1 py-6"
+                    onClick={onReset}
+                  >
+                    Exit Quiz
+                  </Button>
                 </div>
-              </motion.div>
-            )}
+              ) : (
+                <motion.div 
+                  className="p-6 bg-white rounded-xl shadow-md border-t-4 border-quiz-primary mb-6"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <div className="flex flex-col md:flex-row items-center mb-6">
+                    <div className="md:mr-6 mb-4 md:mb-0 flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-r from-quiz-primary to-quiz-secondary text-white text-3xl font-bold">
+                      {score}/{quiz.questions.length}
+                    </div>
+                    
+                    <div>
+                      <h3 className="text-2xl font-bold mb-2 flex items-center">
+                        <Trophy className="text-yellow-500 mr-2" size={24} />
+                        {getScoreMessage()}
+                      </h3>
+                      
+                      <p className="text-gray-600">
+                        You got {score} out of {quiz.questions.length} questions correct 
+                        ({Math.round((score / quiz.questions.length) * 100)}%).
+                      </p>
+                      
+                      {!scoreSubmitted && username && onScoreSubmit && (
+                        <Button
+                          variant="outline"
+                          className="mt-2"
+                          onClick={handleSubmitScore}
+                        >
+                          Save Score
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <Button
+                      className="flex-1"
+                      onClick={resetQuiz}
+                    >
+                      Retry Quiz
+                    </Button>
+                    
+                    <Button
+                      className="flex-1"
+                      onClick={() => setShowMasterChat(true)}
+                    >
+                      Get Help from Master Teacher
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={onReset}
+                    >
+                      Exit Quiz
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </div>
           </>
         ) : (
           <div className="h-[600px]">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold">Master Teacher Chat</h3>
-              <Button variant="outline" onClick={() => setShowMasterChat(false)}>
-                Back to Assessment
-              </Button>
-            </div>
-            <MasterChat 
-              quizTopic={getQuizTopic()} 
-              quizContext={getQuizContext()}
-            />
+            <MasterChat topic={getQuizTopic()} />
           </div>
         )}
       </div>
