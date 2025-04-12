@@ -31,12 +31,12 @@ const LandingSection = ({ onGetStarted }: LandingSectionProps) => {
   // Testimonials data
   const testimonials = [
     {
-      text: "Axion AI completely transformed how I study. The quizzes are incredibly tailored to my learning style!",
+      text: "LearnFlow AI completely transformed how I study. The quizzes are incredibly tailored to my learning style!",
       author: "Sarah Johnson",
       role: "Medical Student"
     },
     {
-      text: "I've tried many learning platforms, but nothing compares to the personalized experience that Axion AI provides.",
+      text: "I've tried many learning platforms, but nothing compares to the personalized experience that LearnFlow AI provides.",
       author: "Michael Chen",
       role: "Software Engineer"
     },
@@ -247,7 +247,7 @@ const LandingSection = ({ onGetStarted }: LandingSectionProps) => {
             <h2 className="text-3xl md:text-4xl font-bold mb-4">How It Works</h2>
             
             <p className="text-lg text-gray-600">
-              Getting started with Axion AI is quick and easy. Follow these simple steps to begin your enhanced learning journey.
+              Getting started with LearnFlow AI is quick and easy. Follow these simple steps to begin your enhanced learning journey.
             </p>
           </motion.div>
 
@@ -277,7 +277,7 @@ const LandingSection = ({ onGetStarted }: LandingSectionProps) => {
             <h2 className="text-3xl md:text-4xl font-bold mb-4">What Our Users Say</h2>
             
             <p className="text-lg text-gray-600">
-              Discover how Axion AI has transformed the learning experience for students worldwide.
+              Discover how LearnFlow AI has transformed the learning experience for students worldwide.
             </p>
           </motion.div>
 
