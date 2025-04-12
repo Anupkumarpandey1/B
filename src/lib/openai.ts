@@ -1,4 +1,3 @@
-
 export async function getTeacherResponse(message: string): Promise<string | null> {
   try {
     const systemPrompt = `You are an expert teacher. Your job is to provide helpful, accurate, and engaging responses to student questions. Keep your answers concise and easy to understand.`;
@@ -152,24 +151,54 @@ export async function generateQuiz(
     console.log("Using difficulty:", difficulty);
     console.log("Using language:", language);
 
+    // Calculate number of each question type
+    const assertionReasonQuestions = Math.ceil(numQuestions * 0.2); // 20% assertion-reason
+    const trueFalseQuestions = Math.ceil(numQuestions * 0.1); // 10% true-false
+    const multipleChoiceQuestions = numQuestions - assertionReasonQuestions - trueFalseQuestions;
+
     // Build the prompt for Gemini API
     const geminiPrompt = `You are an expert AI Quiz Generator. Create a quiz based on the following topic or content: "${prompt}". 
     
-    The quiz should be ${difficulty} difficulty level with ${numQuestions} multiple-choice questions, each having ${numOptions} answer options. For each question:
-      
-    1. Only ONE option should be correct
-    2. Provide clear explanations for why the correct answer is right
-    3. Make wrong answers plausible but clearly incorrect
-    4. Format your response as a valid JSON object with this structure:
+    The quiz should be ${difficulty} difficulty level with ${numQuestions} questions total, structured as follows:
+    
+    1. ${multipleChoiceQuestions} standard multiple-choice questions, each with ${numOptions} options
+    2. ${assertionReasonQuestions} assertion-reason questions (where you provide a statement and a reason, and the user must determine if both are true and if the reason correctly explains the assertion)
+    3. ${trueFalseQuestions} true-false questions
+    
+    For all question types:
+    - Only ONE option should be correct in multiple-choice questions
+    - Provide clear explanations for why the correct answer is right
+    - Make wrong answers plausible but clearly incorrect
+    
+    Format your response as a valid JSON object with this structure:
     {
       "questions": [
         {
-          "question": "Question text goes here?",
+          "question": "Multiple choice question text?",
+          "type": "multiple-choice",
           "options": [
             {"text": "First option", "correct": false, "explanation": ""},
             {"text": "Second option", "correct": true, "explanation": "Detailed explanation why this is correct"},
             {"text": "Third option", "correct": false, "explanation": ""},
             {"text": "Fourth option", "correct": false, "explanation": ""}
+          ]
+        },
+        {
+          "question": "Assertion: [Your assertion statement]. Reason: [Your reason statement].",
+          "type": "assertion-reason",
+          "options": [
+            {"text": "Both assertion and reason are true, and the reason correctly explains the assertion", "correct": false, "explanation": ""},
+            {"text": "Both assertion and reason are true, but the reason does not explain the assertion", "correct": true, "explanation": "Detailed explanation"},
+            {"text": "The assertion is true, but the reason is false", "correct": false, "explanation": ""},
+            {"text": "The assertion is false, but the reason is true", "correct": false, "explanation": ""}
+          ]
+        },
+        {
+          "question": "True/False statement goes here",
+          "type": "true-false",
+          "options": [
+            {"text": "True", "correct": true, "explanation": "Detailed explanation why this is true"},
+            {"text": "False", "correct": false, "explanation": ""}
           ]
         }
         // More questions...
@@ -181,7 +210,7 @@ export async function generateQuiz(
     The explanations should only be provided for correct answers. Make sure all JSON is properly formatted with no errors.`;
 
     // Using Gemini API to generate the quiz
-    const response = await fetch(`${import.meta.env.VITE_GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent'}?key=${import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyAkufDKqoXYUuYupmKxeJ3z36p4Y0Wwr04'}`, {
+    const response = await fetch(`${import.meta.env.VITE_GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'}?key=${import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyAkufDKqoXYUuYupmKxeJ3z36p4Y0Wwr04'}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -249,6 +278,11 @@ export async function generateQuiz(
     console.log("Falling back to OpenAI for quiz generation");
     
     try {
+      // Calculate number of each question type
+      const assertionReasonQuestions = Math.ceil(numQuestions * 0.2); // 20% assertion-reason
+      const trueFalseQuestions = Math.ceil(numQuestions * 0.1); // 10% true-false
+      const multipleChoiceQuestions = numQuestions - assertionReasonQuestions - trueFalseQuestions;
+
       // Using OpenAI as fallback
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -261,21 +295,48 @@ export async function generateQuiz(
           messages: [
             { 
               role: 'system', 
-              content: `You are an expert AI Quiz Generator. Create a quiz based on the following topic or content. The quiz should be ${difficultyOrLanguage} difficulty level with ${numQuestions} multiple-choice questions, each having ${numOptions} answer options. For each question:
+              content: `You are an expert AI Quiz Generator. Create a quiz based on the following topic or content. 
               
-              1. Only ONE option should be correct
-              2. Provide clear explanations for why the correct answer is right
-              3. Make wrong answers plausible but clearly incorrect
-              4. Format your response as a valid JSON object with this structure:
+              The quiz should be ${difficultyOrLanguage} difficulty level with ${numQuestions} questions total, structured as follows:
+              
+              1. ${multipleChoiceQuestions} standard multiple-choice questions, each with ${numOptions} options
+              2. ${assertionReasonQuestions} assertion-reason questions (where you provide a statement and a reason, and the user must determine if both are true and if the reason correctly explains the assertion)
+              3. ${trueFalseQuestions} true-false questions
+              
+              For all question types:
+              - Only ONE option should be correct in multiple-choice questions
+              - Provide clear explanations for why the correct answer is right
+              - Make wrong answers plausible but clearly incorrect
+              
+              Format your response as a valid JSON object with this structure:
               {
                 "questions": [
                   {
-                    "question": "Question text goes here?",
+                    "question": "Multiple choice question text?",
+                    "type": "multiple-choice",
                     "options": [
                       {"text": "First option", "correct": false, "explanation": ""},
                       {"text": "Second option", "correct": true, "explanation": "Detailed explanation why this is correct"},
                       {"text": "Third option", "correct": false, "explanation": ""},
                       {"text": "Fourth option", "correct": false, "explanation": ""}
+                    ]
+                  },
+                  {
+                    "question": "Assertion: [Your assertion statement]. Reason: [Your reason statement].",
+                    "type": "assertion-reason",
+                    "options": [
+                      {"text": "Both assertion and reason are true, and the reason correctly explains the assertion", "correct": false, "explanation": ""},
+                      {"text": "Both assertion and reason are true, but the reason does not explain the assertion", "correct": true, "explanation": "Detailed explanation"},
+                      {"text": "The assertion is true, but the reason is false", "correct": false, "explanation": ""},
+                      {"text": "The assertion is false, but the reason is true", "correct": false, "explanation": ""}
+                    ]
+                  },
+                  {
+                    "question": "True/False statement goes here",
+                    "type": "true-false",
+                    "options": [
+                      {"text": "True", "correct": true, "explanation": "Detailed explanation why this is true"},
+                      {"text": "False", "correct": false, "explanation": ""}
                     ]
                   }
                   // More questions...
