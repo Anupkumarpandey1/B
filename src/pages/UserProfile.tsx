@@ -408,7 +408,7 @@ const UserProfile = () => {
             <Button 
               variant="outline" 
               className="flex items-center gap-2"
-              onClick={() => window.open("https://quiznect-genius.lovable.app/", "_blank")}
+              onClick={() => window.open("https://learnflowai-barrack.netlify.app/", "_blank")}
             >
               <ExternalLink size={16} />
               <span className="hidden sm:inline">Barrack</span>
