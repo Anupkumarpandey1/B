@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { YoutubeTranscript } from 'youtube-transcript';
 import { GEMINI_API_KEY, GEMINI_API_URL, RAPIDAPI_KEY, RAPIDAPI_HOST } from "./config";
@@ -40,65 +39,79 @@ export async function getVideoDetails(youtubeUrl: string): Promise<string | null
   }
 }
 
-export async function getVideoSummary(youtubeUrl: string): Promise<string | null> {
-  try {
-    if (!youtubeUrl.includes('youtube.com/watch?v=') && !youtubeUrl.includes('youtu.be/')) {
-      toast.error('Please enter a valid YouTube URL');
-      return null;
-    }
-
-    // Extract video ID from URL
-    let videoId = '';
-    if (youtubeUrl.includes('youtube.com/watch?v=')) {
-      const urlObj = new URL(youtubeUrl);
-      videoId = urlObj.searchParams.get('v') || '';
-    } else if (youtubeUrl.includes('youtu.be/')) {
-      videoId = youtubeUrl.split('youtu.be/')[1].split('?')[0];
-    }
-
-    if (!videoId) {
-      toast.error('Could not extract video ID from URL');
-      return null;
-    }
-
-    console.log("Fetching summary for video ID:", videoId);
-
-    const response = await fetch(`https://${RAPIDAPI_HOST}/api/v1/get-transcript-v2?video_id=${videoId}&platform=youtube`, {
-      method: 'GET',
-      headers: {
-        'x-rapidapi-key': RAPIDAPI_KEY,
-        'x-rapidapi-host': RAPIDAPI_HOST
+export function getVideoSummary(youtubeUrl: string): Promise<string | null> {
+  return new Promise((resolve, reject) => {
+    try {
+      if (!youtubeUrl.includes('youtube.com/watch?v=') && !youtubeUrl.includes('youtu.be/')) {
+        toast.error('Please enter a valid YouTube URL');
+        return reject('Invalid YouTube URL');
       }
-    });
 
-    if (!response.ok) {
-      console.error('API error:', response.status, response.statusText);
-      throw new Error(`Failed to fetch summary: ${response.status} ${response.statusText}`);
+      // Extract video ID from URL
+      let videoId = '';
+      if (youtubeUrl.includes('youtube.com/watch?v=')) {
+        const urlObj = new URL(youtubeUrl);
+        videoId = urlObj.searchParams.get('v') || '';
+      } else if (youtubeUrl.includes('youtu.be/')) {
+        videoId = youtubeUrl.split('youtu.be/')[1].split('?')[0];
+      }
+
+      if (!videoId) {
+        toast.error('Could not extract video ID from URL');
+        return reject('Could not extract video ID');
+      }
+
+      console.log("Fetching summary for video ID:", videoId);
+
+      const data = null;
+      const xhr = new XMLHttpRequest();
+      xhr.withCredentials = true;
+
+      xhr.addEventListener('readystatechange', function () {
+        if (this.readyState === this.DONE) {
+          console.log("RapidAPI response:", this.responseText);
+          resolve(this.responseText);
+        }
+      });
+
+      xhr.addEventListener('error', function (error) {
+        console.error('XHR error:', error);
+        toast.error('Failed to fetch video summary');
+        reject('Failed to fetch video summary');
+      });
+
+      xhr.open('GET', `https://${RAPIDAPI_HOST}/api/v1/get-transcript-v2?video_id=${videoId}&platform=youtube`);
+      xhr.setRequestHeader('x-rapidapi-key', RAPIDAPI_KEY);
+      xhr.setRequestHeader('x-rapidapi-host', RAPIDAPI_HOST);
+
+      xhr.send(data);
+    } catch (error) {
+      console.error('Error fetching video summary:', error);
+      toast.error('Failed to fetch video summary');
+      reject(error);
     }
-
-    const data = await response.text();
-    console.log("RapidAPI response:", data);
-    return data;
-  } catch (error) {
-    console.error('Error fetching video summary:', error);
-    toast.error('Failed to fetch video summary');
-    return null;
-  }
+  });
 }
 
 export async function getProcessedSummary(rawApiResponse: string, language: 'english' | 'hindi' | 'hinglish' = 'english'): Promise<string | null> {
   try {
     let transcript = "";
+    console.log("Processing raw API response:", rawApiResponse.substring(0, 100) + "...");
     
     try {
       // Try to parse the API response
       const apiData = JSON.parse(rawApiResponse);
+      console.log("Successfully parsed API response:", apiData);
+      
       if (apiData && apiData.transcript) {
+        console.log("Found transcript in API response");
         transcript = apiData.transcript;
       } else if (apiData && apiData.summary) {
+        console.log("Found summary in API response");
         return formatSummaryWithGemini(apiData.summary, language);
       } else {
         // If no structured data found, use the raw response
+        console.log("No transcript or summary found in API response, using raw response");
         transcript = rawApiResponse;
       }
     } catch (e) {
@@ -106,10 +119,19 @@ export async function getProcessedSummary(rawApiResponse: string, language: 'eng
       console.error('Error parsing API response:', e);
       transcript = rawApiResponse;
     }
-
-    return formatSummaryWithGemini(transcript, language);
+    
+    console.log("Sending to Gemini for formatting...");
+    const formattedSummary = await formatSummaryWithGemini(transcript, language);
+    
+    if (!formattedSummary) {
+      toast.error("Failed to format summary with Gemini");
+      // Return the raw transcript as fallback
+      return transcript;
+    }
+    
+    return formattedSummary;
   } catch (error) {
-    console.error('Error processing summary:', error);
+    console.error("Error processing summary:", error);
     toast.error('Failed to process summary');
     return null;
   }
@@ -141,6 +163,10 @@ async function formatSummaryWithGemini(content: string, language: 'english' | 'h
     
     The response should be educational and clearly formatted.`;
 
+    console.log("Sending prompt to Gemini API:", prompt.substring(0, 100) + "...");
+    console.log("Using API URL:", GEMINI_API_URL);
+    console.log("API Key (first few chars):", GEMINI_API_KEY.substring(0, 10) + "...");
+
     const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
@@ -158,19 +184,25 @@ async function formatSummaryWithGemini(content: string, language: 'english' | 'h
     });
 
     if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`);
+      const errorText = await response.text();
+      console.error("Gemini API error response:", errorText);
+      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
     }
 
     const data = await response.json();
+    console.log("Gemini API response data:", data);
+    
     const formattedContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
     
     if (!formattedContent) {
+      console.error("No valid content in Gemini response:", data);
       throw new Error('No content returned from API');
     }
 
     return formattedContent;
   } catch (error) {
-    console.error('Error formatting summary:', error);
+    console.error('Error formatting summary with Gemini:', error);
+    toast.error('Failed to format summary');
     return null;
   }
 }
