@@ -104,7 +104,7 @@ const Navbar = () => {
               ))}
               
               {user && (
-                <Link to="/quiz-generator" className="nav-link text-sm font-medium">
+                <Link to="https://anupkumarpandey1.github.io/Extens/" className="nav-link text-sm font-medium">
                   Assessment Generator
                 </Link>
               )}
