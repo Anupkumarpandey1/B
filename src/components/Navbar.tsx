@@ -105,7 +105,7 @@ const Navbar = () => {
               
               {user && (
                 <Link to="https://anupkumarpandey1.github.io/Extens/" className="nav-link text-sm font-medium">
-                  Assessment Generator
+                  Extensions
                 </Link>
               )}
             </nav>
