@@ -70,11 +70,11 @@ const UserProfile = () => {
   }, [user, loading, navigate]);
 
   useEffect(() => {
-    if (user) {
+    if (activeTab === "assessments" && user) {
       fetchUserAssessments();
       fetchUserLearnPoints();
     }
-  }, [user]);
+  }, [activeTab, user]);
   
   const fetchUserAssessments = async () => {
     setIsLoading(true);
@@ -86,7 +86,10 @@ const UserProfile = () => {
 
       if (createdError) throw createdError;
 
-      const assessmentsWithCounts = await Promise.all((createdData || []).map(async (assessment) => {
+      // Sort by created_at descending (newest first)
+      const sortedCreatedData = (createdData || []).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      const assessmentsWithCounts = await Promise.all((sortedCreatedData).map(async (assessment) => {
         const { count, error } = await supabase
           .from('scores')
           .select('*', { count: 'exact', head: true })

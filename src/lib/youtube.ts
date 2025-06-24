@@ -1,5 +1,4 @@
 import { toast } from "sonner";
-import { YoutubeTranscript } from 'youtube-transcript';
 import { GEMINI_API_KEY, GEMINI_API_URL, RAPIDAPI_KEY, RAPIDAPI_HOST } from "./config";
 
 export async function getVideoDetails(youtubeUrl: string): Promise<string | null> {
@@ -23,15 +22,28 @@ export async function getVideoDetails(youtubeUrl: string): Promise<string | null
       return null;
     }
 
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+    // Fetch transcript from Supadata API
+    const response = await fetch(`https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}`, {
+      method: 'GET',
+      headers: {
+        'x-api-key': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IjEifQ.eyJpc3MiOiJuYWRsZXMiLCJpYXQiOiIxNzQzNTc3NzMzIiwicHVycG9zZSI6ImFwaV9hdXRoZW50aWNhdGlvbiIsInN1YiI6ImUwZDBmMTM3YTYyYTRiYzA4NGRlMTdhMWViZmRjNWUwIn0.5wSvZVmp3s7VOTT8khMKyM3jk74wj0n2ud91o1MEwT4'
+      }
+    });
     
-    if (transcript && transcript.length > 0) {
-      const fullText = transcript.map(entry => entry.text).join(' ');
-      return fullText;
-    } else {
+    if (!response.ok) {
+      toast.error('Failed to fetch video transcript');
+      return null;
+    }
+
+    const data = await response.json();
+    if (!data || !data.transcript || !Array.isArray(data.transcript) || data.transcript.length === 0) {
       toast.error('No transcript available for this video');
       return null;
     }
+
+    // Join all transcript text
+    const fullText = data.transcript.map((entry: any) => entry.text).join(' ');
+    return fullText;
   } catch (error) {
     console.error('Error fetching video details:', error);
     toast.error('Failed to fetch video transcript');
