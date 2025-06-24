@@ -134,7 +134,7 @@ const LandingSection = ({ onGetStarted }: LandingSectionProps) => {
                 </motion.button>
                 
                 <motion.a
-                  href="https://learnflowai-barrack.netlify.app/"
+                  href="https://a-rust-tau.vercel.app/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="secondary-button flex items-center"
