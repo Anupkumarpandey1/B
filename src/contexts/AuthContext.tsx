@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { CheckCircle } from 'lucide-react';
 
 interface AuthContextType {
   session: Session | null;
@@ -92,32 +93,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signUp = async (email: string, password: string) => {
     try {
       // Use production URL for email verification in production
-      const redirectUrl = PROD_URL !== "https://your-production-domain.com" ? PROD_URL : window.location.origin;
+      const redirectUrl = window.location.origin.includes('localhost') ? window.location.origin : PROD_URL;
       const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
         options: {
           emailRedirectTo: redirectUrl,
-          data: {
-            email_confirmed: true
-          }
         }
       });
       
       if (error) throw error;
       
-      if (!data.session) {
-        toast({
-          title: "Signup successful",
-          description: "Please check your email to verify your account, then you can log in.",
-        });
-      } else {
-        // If we have a session, user is automatically signed in (development mode)
-        toast({
-          title: "Signup successful",
-          description: "You are now logged in!",
-        });
-      }
+      // Show a more professional and visible toast notification
+      toast({
+        title: (
+          <div className="flex items-center">
+            <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+            <span className="font-semibold">Verification Email Sent</span>
+          </div>
+        ),
+        description: `A confirmation link has been sent to ${email}. Please check your inbox (and spam folder) to complete your signup.`,
+        duration: 9000, // Make it last longer
+      });
       
       return data;
     } catch (error: any) {
