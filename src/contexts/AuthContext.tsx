@@ -14,6 +14,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const PROD_URL = "https://b-gilt-nine.vercel.app"; // <-- Set to your deployed domain
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -89,14 +91,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = async (email: string, password: string) => {
     try {
-      // For development purposes, we'll use signInWithPassword instead of signUp
-      // to bypass email verification when in development environment
+      // Use production URL for email verification in production
+      const redirectUrl = PROD_URL !== "https://your-production-domain.com" ? PROD_URL : window.location.origin;
       const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
         options: {
-          emailRedirectTo: window.location.origin,
-          // Do not require email verification for development
+          emailRedirectTo: redirectUrl,
           data: {
             email_confirmed: true
           }
