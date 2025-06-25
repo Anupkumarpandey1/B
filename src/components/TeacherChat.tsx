@@ -26,10 +26,14 @@ interface QuizData {
   questions: QuizQuestion[];
 }
 
+interface TeacherChatProps {
+  quizContext?: any;
+}
+
 const GEMINI_API_KEY = 'AIzaSyAkufDKqoXYUuYupmKxeJ3z36p4Y0Wwr04'; // Replace with your actual API key
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
-const TeacherChat = () => {
+const TeacherChat = ({ quizContext }: TeacherChatProps) => {
   const [inputMessage, setInputMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -80,16 +84,18 @@ const TeacherChat = () => {
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
 
-    const userMessage = inputMessage.trim();
+    // Always add assessment context to user message if quizContext is present
+    let messageWithContext = inputMessage.trim();
+    if (quizContext) {
+      const contextSummary = `\n[Assessment Context]\nTitle: ${quizContext.title || 'Assessment'}\nScore: ${quizContext.score}/${quizContext.totalQuestions}\nQuestions: ${quizContext.questions.map((q: any) => `\nQ${q.questionNumber}: ${q.question}\nYour answer: ${q.userAnswer}\nCorrect answer: ${q.correctAnswer}`).join('')}\n`;
+      messageWithContext = `${contextSummary}\n[User Question]\n${inputMessage.trim()}`;
+    }
+
     setInputMessage('');
-    
-    // Add user message to chat (Fixed syntax error here)
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-    
+    setMessages(prev => [...prev, { role: 'user', content: inputMessage.trim() }]);
     setLoading(true);
-    
     try {
-      const response = await getGeminiResponse(userMessage);
+      const response = await getGeminiResponse(messageWithContext);
       setMessages(prev => [...prev, { role: 'bot', content: response }]);
     } catch (error) {
       console.error('Error getting Gemini response:', error);

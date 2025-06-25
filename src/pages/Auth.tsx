@@ -112,48 +112,48 @@ const Auth = () => {
         
         <div className="p-8">
           {isLogin && (
-            <div className="text-center mb-8">
+        <div className="text-center mb-8">
               <h2 className="text-3xl font-bold axion-text-gradient">Welcome Back</h2>
               <p className="text-gray-600 mt-2">Sign in to continue to LearnFlow AI</p>
-            </div>
+        </div>
           )}
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleAuth)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="your.email@example.com" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleAuth)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="your.email@example.com" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="password" 
-                        placeholder="••••••••" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="password" 
+                      placeholder="••••••••" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
               {!isLogin && (
                 <FormField
@@ -175,35 +175,35 @@ const Auth = () => {
                 />
               )}
 
-              <Button
-                type="submit"
+            <Button
+              type="submit"
                 className={`w-full py-3 font-semibold transition-colors duration-300 ${isLogin ? 'axion-button' : 'bg-green-600 hover:bg-green-700 text-white'}`}
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : isLogin ? (
-                  'Sign In'
-                ) : (
-                  'Create My Account'
-                )}
-              </Button>
-            </form>
-          </Form>
-
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-primary hover:underline transition-colors"
-              type="button"
+              disabled={loading}
             >
-              {isLogin
-                ? "Don't have an account? Sign Up"
-                : 'Already have an account? Sign In'}
-            </button>
+              {loading ? (
+                <>
+                  <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : isLogin ? (
+                'Sign In'
+              ) : (
+                  'Create My Account'
+              )}
+            </Button>
+          </form>
+        </Form>
+
+        <div className="mt-6 text-center">
+          <button
+            onClick={() => setIsLogin(!isLogin)}
+            className="text-primary hover:underline transition-colors"
+            type="button"
+          >
+            {isLogin
+              ? "Don't have an account? Sign Up"
+              : 'Already have an account? Sign In'}
+          </button>
           </div>
         </div>
       </motion.div>

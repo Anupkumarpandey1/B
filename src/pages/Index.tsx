@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -391,7 +390,7 @@ const Index = () => {
               
               {!quiz && !showLeaderboard && user && (
                 <div className="h-[600px] md:h-[800px]">
-                  <TeacherChat />
+                  <TeacherChat quizContext={quiz && typeof getQuizContext === 'function' ? getQuizContext() : undefined} />
                 </div>
               )}
               

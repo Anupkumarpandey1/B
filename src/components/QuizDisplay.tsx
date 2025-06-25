@@ -429,7 +429,10 @@ const QuizDisplay = ({ quiz, onReset, username, onScoreSubmit, creatorName }: Qu
           </>
         ) : (
           <div className="h-[600px]">
-            <MasterChat topic={getQuizTopic()} />
+            <MasterChat 
+              quizTopic={getQuizTopic()} 
+              quizContext={getQuizContext()} 
+            />
           </div>
         )}
       </div>

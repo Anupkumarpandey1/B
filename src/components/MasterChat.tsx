@@ -94,6 +94,13 @@ const MasterChat = ({ quizTopic, quizContext }: MasterChatProps) => {
     e.preventDefault();
     
     if (!newMessage.trim() || !user) return;
+
+    // Always add assessment context to user message if quizContext is present
+    let messageWithContext = newMessage;
+    if (quizContext) {
+      const contextSummary = `\n[Assessment Context]\nTitle: ${quizContext.title || 'Assessment'}\nScore: ${quizContext.score}/${quizContext.totalQuestions}\nQuestions: ${quizContext.questions.map(q => `\nQ${q.questionNumber}: ${q.question}\nYour answer: ${q.userAnswer}\nCorrect answer: ${q.correctAnswer}`).join('')}\n`;
+      messageWithContext = `${contextSummary}\n[User Question]\n${newMessage}`;
+    }
     
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -108,7 +115,7 @@ const MasterChat = ({ quizTopic, quizContext }: MasterChatProps) => {
     setTimeout(() => {
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: generateResponse(newMessage, quizTopic, quizContext),
+        text: generateResponse(messageWithContext, quizTopic, quizContext),
         sender: 'ai'
       };
       

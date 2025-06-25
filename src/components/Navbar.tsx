@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, LogOut, User } from 'lucide-react';
@@ -32,7 +31,7 @@ const Navbar = () => {
 
   // Simplified navigation links - removed pricing, testimonials, etc.
   const navLinks = [
-    { name: 'Home', href: '#' },
+    { name: 'Home', href: '/' },
     { name: 'Features', href: '#features' },
     { name: 'How It Works', href: '#how-it-works' },
   ];
@@ -82,25 +81,38 @@ const Navbar = () => {
         <div className="axion-container py-4 px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <a href="#" className="flex items-center space-x-2">
+              <span
+                className="flex items-center space-x-2 cursor-pointer"
+                onClick={() => navigate('/')}
+              >
                 <span className="text-2xl font-bold axion-text-gradient">LearnFlow AI</span>
-              </a>
+              </span>
             </div>
 
             {/* Desktop navigation */}
             <nav className="hidden md:flex items-center space-x-8">
               {navLinks.map((link) => (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    scrollToSection(link.href);
-                  }}
-                  className="nav-link text-sm font-medium"
-                >
-                  {link.name}
-                </a>
+                link.name === 'Home' ? (
+                  <span
+                    key={link.name}
+                    className="nav-link text-sm font-medium cursor-pointer"
+                    onClick={() => navigate('/')}
+                  >
+                    {link.name}
+                  </span>
+                ) : (
+                  <a
+                    key={link.name}
+                    href={link.href}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      scrollToSection(link.href);
+                    }}
+                    className="nav-link text-sm font-medium"
+                  >
+                    {link.name}
+                  </a>
+                )
               ))}
               
               {user && (
@@ -184,9 +196,12 @@ const Navbar = () => {
           >
             <div className="p-6">
               <div className="flex items-center justify-between mb-8">
-                <a href="#" className="flex items-center space-x-2">
+                <span
+                  className="flex items-center space-x-2 cursor-pointer"
+                  onClick={() => navigate('/')}
+                >
                   <span className="text-2xl font-bold axion-text-gradient">LearnFlow AI</span>
-                </a>
+                </span>
                 <button onClick={() => setMobileMenuOpen(false)} className="text-gray-500">
                   <X size={24} />
                 </button>
