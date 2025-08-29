@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Brain, Youtube, FileUp, Loader2, AlertCircle, Sparkles, FileText, ToggleLeft, ToggleRight, BookOpen, File, Globe } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from "sonner";
-import { generateQuiz, extractFromYouTube, getSummaryFromYouTube, getProcessedSummaryFromYouTube, analyzeImageWithGemini, processExtractedText } from '@/lib/openai';
+import { generateQuiz, extractFromYouTube, getSummaryFromYouTube, getProcessedSummaryFromYouTube, analyzeImageWithGemini, processExtractedText, checkAPIHealth } from '@/lib/openai';
 import { cn } from '@/lib/utils';
 import { DEFAULT_QUIZ_PARAMS, SUPPORTED_LANGUAGES } from '@/lib/config';
 import { Switch } from '@/components/ui/switch';
@@ -209,17 +209,40 @@ const AssessmentGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
         throw new Error('Failed to extract content');
       }
       
+      console.log('Starting quiz generation with prompt:', prompt);
       const quizData = await generateQuiz(prompt, numQuestions, numOptions, language);
       
       if (quizData) {
         onQuizGenerated(quizData);
         toast.success('Quiz generated successfully!');
       } else {
-        throw new Error('Failed to generate quiz');
+        throw new Error('Failed to generate quiz - no data returned');
       }
     } catch (error) {
       console.error('Quiz generation error:', error);
-      setError(error instanceof Error ? error.message : 'An unexpected error occurred');
+      let errorMessage = 'An unexpected error occurred';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        
+        // Provide more specific error messages
+        if (error.message.includes('API call failed')) {
+          if (error.message.includes('Gemini')) {
+            errorMessage = 'Gemini API is currently unavailable. Please try again later or contact support.';
+          } else if (error.message.includes('OpenAI')) {
+            errorMessage = 'OpenAI API is currently unavailable. Please try again later or contact support.';
+          }
+        } else if (error.message.includes('Both Gemini and OpenAI failed')) {
+          errorMessage = 'Both AI services are currently unavailable. Please try again later.';
+        } else if (error.message.includes('Invalid JSON')) {
+          errorMessage = 'AI response format error. Please try again with a different prompt.';
+        } else if (error.message.includes('No candidates') || error.message.includes('No choices')) {
+          errorMessage = 'AI service returned empty response. Please try again.';
+        }
+      }
+      
+      setError(errorMessage);
+      toast.error(`Quiz generation failed: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -291,7 +314,23 @@ const AssessmentGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
           <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-md">
             <div className="flex items-start">
               <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 mr-3" />
-              <p className="text-sm text-red-700">{error}</p>
+              <div>
+                <p className="text-sm text-red-700">{error}</p>
+                {process.env.NODE_ENV === 'development' && (
+                  <details className="mt-2">
+                    <summary className="text-xs text-red-600 cursor-pointer">Debug Info</summary>
+                    <div className="mt-2 text-xs text-red-600 bg-red-100 p-2 rounded">
+                      <p>Input Type: {inputType}</p>
+                      <p>Language: {language}</p>
+                      <p>Questions: {numQuestions}</p>
+                      <p>Options: {numOptions}</p>
+                      {inputType === 'prompt' && <p>Prompt Length: {userPrompt.length}</p>}
+                      {inputType === 'youtube' && <p>YouTube URL: {youtubeUrl}</p>}
+                      {inputType === 'pdf' && <p>PDF Selected: {selectedPdf?.name || 'None'}</p>}
+                    </div>
+                  </details>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -569,6 +608,65 @@ const AssessmentGenerator = ({ onQuizGenerated }: QuizGeneratorProps) => {
             </>
           )}
         </motion.button>
+
+        {/* Debug section for development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Debug Information</h4>
+            <div className="text-xs text-gray-600 space-y-1">
+              <p>Gemini API Key: {import.meta.env.VITE_GEMINI_API_KEY ? 'Present' : 'Missing'}</p>
+              <p>OpenAI API Key: {import.meta.env.VITE_OPENAI_API_KEY ? 'Present' : 'Missing'}</p>
+              <p>Current Language: {language}</p>
+              <p>Input Type: {inputType}</p>
+            </div>
+            <div className="mt-3 space-y-2">
+              <button
+                onClick={async () => {
+                  try {
+                    const health = await checkAPIHealth();
+                    if (health.gemini && health.openai) {
+                      toast.success('Both APIs are healthy!');
+                    } else if (health.gemini || health.openai) {
+                      toast.warning(`Partial API health: Gemini: ${health.gemini ? '✅' : '❌'}, OpenAI: ${health.openai ? '✅' : '❌'}`);
+                    } else {
+                      toast.error('Both APIs are unhealthy. Check console for details.');
+                    }
+                    console.log('API Health Check Results:', health);
+                  } catch (error) {
+                    toast.error(`Health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                  }
+                }}
+                className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600 mr-2"
+              >
+                Check API Health
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const testResponse = await fetch(`${import.meta.env.VITE_GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'}?key=${import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyAWFGHhI3vjvkjpzM70sDOBQsW_L5w5QdY'}`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        contents: [{ parts: [{ text: 'Hello, this is a test message.' }] }],
+                        generationConfig: { temperature: 0.7, maxOutputTokens: 100 }
+                      })
+                    });
+                    if (testResponse.ok) {
+                      toast.success('Gemini API connection test successful!');
+                    } else {
+                      toast.error(`Gemini API test failed: ${testResponse.status}`);
+                    }
+                  } catch (error) {
+                    toast.error(`API test error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                  }
+                }}
+                className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+              >
+                Test Gemini API Connection
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </motion.div>
   );

@@ -1,12 +1,76 @@
+import { GEMINI_API_KEY, GEMINI_API_URL, OPENAI_API_KEY, OPENAI_API_URL } from './config';
+
+// API Health Check Function
+export async function checkAPIHealth(): Promise<{ gemini: boolean; openai: boolean; errors: string[] }> {
+  const errors: string[] = [];
+  let geminiHealthy = false;
+  let openaiHealthy = false;
+
+  // Test Gemini API
+  try {
+    const geminiResponse = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: 'Test message' }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 50 }
+      })
+    });
+    
+    if (geminiResponse.ok) {
+      geminiHealthy = true;
+      console.log('✅ Gemini API is healthy');
+    } else {
+      const errorText = await geminiResponse.text();
+      errors.push(`Gemini API error: ${geminiResponse.status} - ${errorText}`);
+      console.error('❌ Gemini API error:', geminiResponse.status, errorText);
+    }
+  } catch (error) {
+    errors.push(`Gemini API connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error('❌ Gemini API connection failed:', error);
+  }
+
+  // Test OpenAI API
+  try {
+    const openaiResponse = await fetch(OPENAI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: 'Test message' }],
+        temperature: 0.7,
+        max_tokens: 50
+      })
+    });
+    
+    if (openaiResponse.ok) {
+      openaiHealthy = true;
+      console.log('✅ OpenAI API is healthy');
+    } else {
+      const errorText = await openaiResponse.text();
+      errors.push(`OpenAI API error: ${openaiResponse.status} - ${errorText}`);
+      console.error('❌ OpenAI API error:', openaiResponse.status, errorText);
+    }
+  } catch (error) {
+    errors.push(`OpenAI API connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error('❌ OpenAI API connection failed:', error);
+  }
+
+  return { gemini: geminiHealthy, openai: openaiHealthy, errors };
+}
+
 export async function getTeacherResponse(message: string): Promise<string | null> {
   try {
     const systemPrompt = `You are an expert teacher. Your job is to provide helpful, accurate, and engaging responses to student questions. Keep your answers concise and easy to understand.`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(OPENAI_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
       },
       body: JSON.stringify({
         model: 'gpt-4o',
@@ -150,6 +214,8 @@ export async function generateQuiz(
     console.log("Generating quiz with prompt:", prompt);
     console.log("Using difficulty:", difficulty);
     console.log("Using language:", language);
+    console.log("Using Gemini API key:", GEMINI_API_KEY ? 'Present' : 'Missing');
+    console.log("Using Gemini API URL:", GEMINI_API_URL);
 
     // Calculate number of each question type
     const assertionReasonQuestions = Math.ceil(numQuestions * 0.2); // 20% assertion-reason
@@ -210,7 +276,7 @@ export async function generateQuiz(
     The explanations should only be provided for correct answers. Make sure all JSON is properly formatted with no errors.`;
 
     // Using Gemini API to generate the quiz
-    const response = await fetch(`${import.meta.env.VITE_GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'}?key=${import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyAkufDKqoXYUuYupmKxeJ3z36p4Y0Wwr04'}`, {
+    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -233,19 +299,21 @@ export async function generateQuiz(
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Gemini API Error Response:", errorText);
-      throw new Error(`API call failed with status: ${response.status} - ${errorText}`);
+      console.error("Response status:", response.status);
+      console.error("Response headers:", Object.fromEntries(response.headers.entries()));
+      throw new Error(`Gemini API call failed with status: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
     console.log("Gemini API Response Data:", data);
     
     if (!data.candidates || data.candidates.length === 0) {
-      console.error("No candidates in response");
-      return null;
+      console.error("No candidates in Gemini response");
+      throw new Error("No candidates in Gemini response");
     }
     
     const content = data.candidates[0].content.parts[0].text;
-    console.log("Raw content:", content);
+    console.log("Raw Gemini content:", content);
     
     try {
       // Parse the JSON string to extract the quiz object
@@ -253,26 +321,26 @@ export async function generateQuiz(
       const jsonEnd = content.lastIndexOf('}') + 1;
       
       if (jsonStart === -1 || jsonEnd === 0) {
-        console.error("Could not find valid JSON in response");
-        return null;
+        console.error("Could not find valid JSON in Gemini response");
+        throw new Error("Invalid JSON response from Gemini");
       }
       
       const jsonString = content.substring(jsonStart, jsonEnd);
       
       const quiz = JSON.parse(jsonString);
-      console.log("Parsed quiz data:", quiz);
+      console.log("Parsed quiz data from Gemini:", quiz);
       
       // Add difficulty to the quiz data
       quiz.difficulty = difficulty;
       
       return quiz;
     } catch (err) {
-      console.error("Error parsing quiz JSON:", err);
+      console.error("Error parsing quiz JSON from Gemini:", err);
       console.error("Content:", content);
-      return null;
+      throw new Error("Failed to parse Gemini response");
     }
   } catch (error) {
-    console.error("Error generating quiz:", error);
+    console.error("Error generating quiz with Gemini:", error);
     
     // Fallback to OpenAI if Gemini fails
     console.log("Falling back to OpenAI for quiz generation");
@@ -283,12 +351,14 @@ export async function generateQuiz(
       const trueFalseQuestions = Math.ceil(numQuestions * 0.1); // 10% true-false
       const multipleChoiceQuestions = numQuestions - assertionReasonQuestions - trueFalseQuestions;
 
+      console.log("Using OpenAI fallback with key:", OPENAI_API_KEY ? 'Present' : 'Missing');
+
       // Using OpenAI as fallback
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch(OPENAI_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`
+          'Authorization': `Bearer ${OPENAI_API_KEY}`
         },
         body: JSON.stringify({
           model: 'gpt-4o-mini',
@@ -355,7 +425,7 @@ export async function generateQuiz(
       if (!response.ok) {
         const errorText = await response.text();
         console.error("OpenAI API Error Response:", errorText);
-        throw new Error(`API call failed with status: ${response.status} - ${errorText}`);
+        throw new Error(`OpenAI API call failed with status: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
@@ -363,30 +433,30 @@ export async function generateQuiz(
       
       if (data.error) {
         console.error("OpenAI API Error:", data.error);
-        return null;
+        throw new Error(`OpenAI API error: ${data.error.message || 'Unknown error'}`);
       }
       
       if (!data.choices || data.choices.length === 0) {
-        console.error("No choices in response");
-        return null;
+        console.error("No choices in OpenAI response");
+        throw new Error("No choices in OpenAI response");
       }
       
       const content = data.choices[0].message.content;
-      console.log("Raw content:", content);
+      console.log("Raw OpenAI content:", content);
       
       // Parse the JSON string to extract the quiz object
       const jsonStart = content.indexOf('{');
       const jsonEnd = content.lastIndexOf('}') + 1;
       
       if (jsonStart === -1 || jsonEnd === 0) {
-        console.error("Could not find valid JSON in response");
-        return null;
+        console.error("Could not find valid JSON in OpenAI response");
+        throw new Error("Invalid JSON response from OpenAI");
       }
       
       const jsonString = content.substring(jsonStart, jsonEnd);
       
       const quiz = JSON.parse(jsonString);
-      console.log("Parsed quiz data:", quiz);
+      console.log("Parsed quiz data from OpenAI:", quiz);
       
       // Add difficulty to the quiz data
       const isDifficulty = ['easy', 'medium', 'hard'].includes(difficultyOrLanguage);
@@ -396,7 +466,7 @@ export async function generateQuiz(
       return quiz;
     } catch (fallbackError) {
       console.error("Error in OpenAI fallback:", fallbackError);
-      return null;
+      throw new Error(`Both Gemini and OpenAI failed: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`);
     }
   }
 }
