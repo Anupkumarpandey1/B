@@ -6,11 +6,18 @@ export const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyAWFG
 export const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 export const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
+// YouTube and RapidAPI Configuration
+export const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY || 'your-youtube-api-key-here';
+export const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY || '88e9d73b57msh9982c179daafdb7efwfep1d1688jsn6d4186f6ca5a';
+export const RAPIDAPI_HOST = import.meta.env.VITE_RAPIDAPI_HOST || 'youtube-video-summarizer-gpt-ai.p.rapidapi.com';
+export const YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3';
+
 // Debug logging for development (moved after all constants are declared)
 if (process.env.NODE_ENV === 'development') {
   console.log('Config loaded:');
   console.log('Gemini API Key:', GEMINI_API_KEY ? 'Present' : 'Missing');
   console.log('OpenAI API Key:', OPENAI_API_KEY ? 'Present' : 'Missing');
+  console.log('RapidAPI Key:', RAPIDAPI_KEY ? 'Present' : 'Missing');
   console.log('Gemini API URL:', GEMINI_API_URL);
   console.log('OpenAI API URL:', OPENAI_API_URL);
 }
