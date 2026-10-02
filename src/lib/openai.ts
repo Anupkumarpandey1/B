@@ -3,7 +3,14 @@ import { GEMINI_API_KEY } from './config';
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
 // Candidate models in order of stability
-const STABLE_GEMINI_MODELS = ["gemini-flash-latest", "gemini-3.8-flash"];
+const STABLE_GEMINI_MODELS = [
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemini-3.7-flash",
+  "gemini-3.8-flash",
+  "gemini-flash-latest",
+  "gemini-pro-latest"
+];
 
 // Helper to make resilient Gemini API calls with automatic model fallback
 export const callGeminiAPI = async (prompt: string): Promise<string> => {
@@ -49,28 +56,34 @@ export const callGeminiAPI = async (prompt: string): Promise<string> => {
 export const safeParseJSON = <T>(text: string, fallback: T): T => {
   if (!text) return fallback;
   
+  // Clean markdown block wrappers if present
+  let cleanText = text.trim();
+  if (cleanText.startsWith('```')) {
+    cleanText = cleanText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  }
+  
   // 1. Try direct parse
   try {
-    return JSON.parse(text);
+    return JSON.parse(cleanText);
   } catch (_) { }
   
   // 2. Try extracting JSON array [ ... ]
-  const arrayStart = text.indexOf('[');
-  const arrayEnd = text.lastIndexOf(']');
+  const arrayStart = cleanText.indexOf('[');
+  const arrayEnd = cleanText.lastIndexOf(']');
   if (arrayStart !== -1 && arrayEnd > arrayStart) {
     try {
-      return JSON.parse(text.substring(arrayStart, arrayEnd + 1));
+      return JSON.parse(cleanText.substring(arrayStart, arrayEnd + 1));
     } catch (e) {
       console.warn("Array JSON extraction failed:", e);
     }
   }
   
   // 3. Try extracting JSON object { ... }
-  const objStart = text.indexOf('{');
-  const objEnd = text.lastIndexOf('}');
+  const objStart = cleanText.indexOf('{');
+  const objEnd = cleanText.lastIndexOf('}');
   if (objStart !== -1 && objEnd > objStart) {
     try {
-      return JSON.parse(text.substring(objStart, objEnd + 1));
+      return JSON.parse(cleanText.substring(objStart, objEnd + 1));
     } catch (e) {
       console.warn("Object JSON extraction failed:", e);
     }
@@ -271,19 +284,17 @@ Return ONLY the JSON object, no markdown or additional text.`;
     const quizData = safeParseJSON<any>(generatedText, null);
     
     if (quizData && quizData.questions && Array.isArray(quizData.questions)) {
-      console.log("✅ Successfully parsed quiz data");
+      console.log("✅ Successfully parsed quiz data from Gemini API");
       return {
         ...quizData,
         difficulty
       };
     }
     
-    console.warn("Failed to parse, using fallback");
-    return createFallbackQuiz(prompt, numQuestions);
+    throw new Error("Failed to parse quiz response from Gemini API.");
     
   } catch (error) {
     console.error("Error generating quiz:", error);
-    console.warn("Using fallback quiz due to error");
-    return createFallbackQuiz(prompt, numQuestions);
+    throw error;
   }
 }
