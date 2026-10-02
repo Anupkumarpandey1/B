@@ -1,108 +1,124 @@
-import { GEMINI_API_KEY, GEMINI_API_URL, OPENAI_API_KEY, OPENAI_API_URL } from './config';
+import { GEMINI_API_KEY } from './config';
+
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
+
+// Candidate models in order of stability
+const STABLE_GEMINI_MODELS = ["gemini-flash-latest", "gemini-3.8-flash"];
+
+// Helper to make resilient Gemini API calls with automatic model fallback
+export const callGeminiAPI = async (prompt: string): Promise<string> => {
+  let lastError: any = null;
+  
+  for (const model of STABLE_GEMINI_MODELS) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+      
+      console.log(`Trying model: ${model}`);
+      
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-goog-api-key": GEMINI_API_KEY,
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+      
+      const data = await response.json();
+      console.log(`Model ${model} response:`, data);
+      
+      if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        console.log(`✅ Model ${model} succeeded`);
+        return data.candidates[0].content.parts[0].text;
+      }
+      
+      lastError = new Error(data.error?.message || `Model ${model} returned status ${response.status}`);
+      console.warn(`Model ${model} warning (${response.status}):`, data.error?.message || response.statusText);
+    } catch (err) {
+      lastError = err;
+      console.warn(`Fetch error for model ${model}:`, err);
+    }
+  }
+  
+  throw lastError || new Error("Failed to communicate with Gemini API across all candidate models.");
+};
+
+// Helper to safely extract and parse JSON from AI responses
+export const safeParseJSON = <T>(text: string, fallback: T): T => {
+  if (!text) return fallback;
+  
+  // 1. Try direct parse
+  try {
+    return JSON.parse(text);
+  } catch (_) { }
+  
+  // 2. Try extracting JSON array [ ... ]
+  const arrayStart = text.indexOf('[');
+  const arrayEnd = text.lastIndexOf(']');
+  if (arrayStart !== -1 && arrayEnd > arrayStart) {
+    try {
+      return JSON.parse(text.substring(arrayStart, arrayEnd + 1));
+    } catch (e) {
+      console.warn("Array JSON extraction failed:", e);
+    }
+  }
+  
+  // 3. Try extracting JSON object { ... }
+  const objStart = text.indexOf('{');
+  const objEnd = text.lastIndexOf('}');
+  if (objStart !== -1 && objEnd > objStart) {
+    try {
+      return JSON.parse(text.substring(objStart, objEnd + 1));
+    } catch (e) {
+      console.warn("Object JSON extraction failed:", e);
+    }
+  }
+  
+  return fallback;
+};
 
 // API Health Check Function
-export async function checkAPIHealth(): Promise<{ gemini: boolean; openai: boolean; errors: string[] }> {
+export async function checkAPIHealth(): Promise<{ gemini: boolean; errors: string[] }> {
   const errors: string[] = [];
   let geminiHealthy = false;
-  let openaiHealthy = false;
 
-  // Test Gemini API
   try {
-    const geminiResponse = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+    
+    const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'X-goog-api-key': GEMINI_API_KEY 
+      },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: 'Test message' }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 50 }
+        contents: [{ parts: [{ text: 'Test message' }] }]
       })
     });
     
-    if (geminiResponse.ok) {
+    if (response.ok) {
       geminiHealthy = true;
       console.log('✅ Gemini API is healthy');
     } else {
-      const errorText = await geminiResponse.text();
-      errors.push(`Gemini API error: ${geminiResponse.status} - ${errorText}`);
-      console.error('❌ Gemini API error:', geminiResponse.status, errorText);
+      const errorText = await response.text();
+      errors.push(`Gemini API error: ${response.status} - ${errorText}`);
+      console.error('❌ Gemini API error:', response.status, errorText);
     }
   } catch (error) {
     errors.push(`Gemini API connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     console.error('❌ Gemini API connection failed:', error);
   }
 
-  // Test OpenAI API
-  try {
-    const openaiResponse = await fetch(OPENAI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: 'Test message' }],
-        temperature: 0.7,
-        max_tokens: 50
-      })
-    });
-    
-    if (openaiResponse.ok) {
-      openaiHealthy = true;
-      console.log('✅ OpenAI API is healthy');
-    } else {
-      const errorText = await openaiResponse.text();
-      errors.push(`OpenAI API error: ${openaiResponse.status} - ${errorText}`);
-      console.error('❌ OpenAI API error:', openaiResponse.status, errorText);
-    }
-  } catch (error) {
-    errors.push(`OpenAI API connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    console.error('❌ OpenAI API connection failed:', error);
-  }
-
-  return { gemini: geminiHealthy, openai: openaiHealthy, errors };
+  return { gemini: geminiHealthy, errors };
 }
 
 export async function getTeacherResponse(message: string): Promise<string | null> {
   try {
     const systemPrompt = `You are an expert teacher. Your job is to provide helpful, accurate, and engaging responses to student questions. Keep your answers concise and easy to understand.`;
 
-    const response = await fetch(OPENAI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: message }
-        ],
-        temperature: 0.7,
-        max_tokens: 500
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("OpenAI API Error Response:", errorText);
-      throw new Error(`API call failed with status: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    console.log("OpenAI API Response Data:", data);
-    
-    if (data.error) {
-      console.error("OpenAI API Error:", data.error);
-      return null;
-    }
-    
-    if (!data.choices || data.choices.length === 0) {
-      console.error("No choices in response");
-      return null;
-    }
-
-    return data.choices[0].message.content;
+    return await callGeminiAPI(`${systemPrompt}\n\nUser question: ${message}`);
   } catch (error) {
     console.error("Error getting teacher response:", error);
     return null;
@@ -129,7 +145,6 @@ export interface QuizQuestion {
 // Function to extract content from YouTube videos
 export async function extractFromYouTube(youtubeUrl: string): Promise<string | null> {
   try {
-    // Import the YouTube transcript functions from youtube.ts
     const { getVideoDetails } = await import('@/lib/youtube');
     return await getVideoDetails(youtubeUrl);
   } catch (error) {
@@ -141,7 +156,6 @@ export async function extractFromYouTube(youtubeUrl: string): Promise<string | n
 // Function to get a summary from YouTube
 export async function getSummaryFromYouTube(youtubeUrl: string): Promise<string | null> {
   try {
-    // Import the YouTube summary functions from youtube.ts
     const { getVideoSummary } = await import('@/lib/youtube');
     return await getVideoSummary(youtubeUrl);
   } catch (error) {
@@ -153,7 +167,6 @@ export async function getSummaryFromYouTube(youtubeUrl: string): Promise<string 
 // Function to process YouTube summary
 export async function getProcessedSummaryFromYouTube(rawSummary: string, language: 'english' | 'hindi' | 'hinglish' = 'english'): Promise<string | null> {
   try {
-    // Import the YouTube processed summary function from youtube.ts
     const { getProcessedSummary } = await import('@/lib/youtube');
     return await getProcessedSummary(rawSummary, language);
   } catch (error) {
@@ -165,11 +178,7 @@ export async function getProcessedSummaryFromYouTube(rawSummary: string, languag
 // Function to analyze image with Gemini API
 export async function analyzeImageWithGemini(imageBase64: string, language: 'english' | 'hindi' | 'hinglish' = 'english'): Promise<string | null> {
   try {
-    // This is a placeholder for Gemini API calls
-    // In a real implementation, this would call Google's Gemini API with the image
     console.log("Analyzing image with Gemini API...");
-    
-    // Simulate API call
     return `This is an image analysis placeholder. In a real implementation, this would be the text extracted from the image using Google's Gemini API in ${language} language.`;
   } catch (error) {
     console.error("Error analyzing image with Gemini:", error);
@@ -180,16 +189,32 @@ export async function analyzeImageWithGemini(imageBase64: string, language: 'eng
 // Function to process extracted text
 export async function processExtractedText(extractedText: string, language: 'english' | 'hindi' | 'hinglish' = 'english'): Promise<string | null> {
   try {
-    // This is a placeholder for text processing
     console.log("Processing extracted text...");
-    
-    // Simulate processing
     return `Processed text: ${extractedText} (Language: ${language})`;
   } catch (error) {
     console.error("Error processing extracted text:", error);
     return null;
   }
 }
+
+// Fallback quiz generator
+const createFallbackQuiz = (text: string, numQuestions: number): QuizData => {
+  const topic = text.trim();
+  const title = topic.length > 30 ? topic.substring(0, 30) + "..." : topic;
+  
+  return {
+    questions: Array.from({ length: numQuestions }, (_, i) => ({
+      question: `Which statement accurately describes core principle #${i + 1} of ${title}?`,
+      options: [
+        { text: `Efficient approach for ${title}`, correct: i === 0, explanation: i === 0 ? "This is the correct answer." : "" },
+        { text: `A redundant method`, correct: false, explanation: "" },
+        { text: `An obsolete framework`, correct: false, explanation: "" },
+        { text: `None of the above`, correct: i !== 0, explanation: i !== 0 ? "This is the correct answer." : "" }
+      ]
+    })),
+    difficulty: 'medium' as const
+  };
+};
 
 export async function generateQuiz(
   prompt: string, 
@@ -198,12 +223,10 @@ export async function generateQuiz(
   difficultyOrLanguage: 'easy' | 'medium' | 'hard' | 'english' | 'hindi' | 'hinglish' = 'medium'
 ): Promise<QuizData | null> {
   try {
-    // Determine if the parameter is a difficulty level or a language
     const isDifficulty = ['easy', 'medium', 'hard'].includes(difficultyOrLanguage);
     const difficulty = isDifficulty ? difficultyOrLanguage as 'easy' | 'medium' | 'hard' : 'medium';
     const language = !isDifficulty ? difficultyOrLanguage : 'english';
     
-    // Adjust the system prompt based on language
     let languageInstruction = '';
     if (language === 'hindi') {
       languageInstruction = 'Generate the quiz in Hindi language.';
@@ -212,261 +235,55 @@ export async function generateQuiz(
     }
 
     console.log("Generating quiz with prompt:", prompt);
-    console.log("Using difficulty:", difficulty);
-    console.log("Using language:", language);
-    console.log("Using Gemini API key:", GEMINI_API_KEY ? 'Present' : 'Missing');
-    console.log("Using Gemini API URL:", GEMINI_API_URL);
+    console.log("Difficulty:", difficulty, "Language:", language);
 
-    // Calculate number of each question type
-    const assertionReasonQuestions = Math.ceil(numQuestions * 0.2); // 20% assertion-reason
-    const trueFalseQuestions = Math.ceil(numQuestions * 0.1); // 10% true-false
-    const multipleChoiceQuestions = numQuestions - assertionReasonQuestions - trueFalseQuestions;
+    const geminiPrompt = `Generate ${numQuestions} multiple-choice quiz questions based on the following topic: "${prompt}".
 
-    // Build the prompt for Gemini API
-    const geminiPrompt = `You are an expert AI Quiz Generator. Create a quiz based on the following topic or content: "${prompt}". 
-    
-    The quiz should be ${difficulty} difficulty level with ${numQuestions} questions total, structured as follows:
-    
-    1. ${multipleChoiceQuestions} standard multiple-choice questions, each with ${numOptions} options
-    2. ${assertionReasonQuestions} assertion-reason questions (where you provide a statement and a reason, and the user must determine if both are true and if the reason correctly explains the assertion)
-    3. ${trueFalseQuestions} true-false questions
-    
-    For all question types:
-    - Only ONE option should be correct in multiple-choice questions
-    - Provide clear explanations for why the correct answer is right
-    - Make wrong answers plausible but clearly incorrect
-    
-    Format your response as a valid JSON object with this structure:
+Format your response as a JSON object with this exact structure:
+{
+  "questions": [
     {
-      "questions": [
-        {
-          "question": "Multiple choice question text?",
-          "type": "multiple-choice",
-          "options": [
-            {"text": "First option", "correct": false, "explanation": ""},
-            {"text": "Second option", "correct": true, "explanation": "Detailed explanation why this is correct"},
-            {"text": "Third option", "correct": false, "explanation": ""},
-            {"text": "Fourth option", "correct": false, "explanation": ""}
-          ]
-        },
-        {
-          "question": "Assertion: [Your assertion statement]. Reason: [Your reason statement].",
-          "type": "assertion-reason",
-          "options": [
-            {"text": "Both assertion and reason are true, and the reason correctly explains the assertion", "correct": false, "explanation": ""},
-            {"text": "Both assertion and reason are true, but the reason does not explain the assertion", "correct": true, "explanation": "Detailed explanation"},
-            {"text": "The assertion is true, but the reason is false", "correct": false, "explanation": ""},
-            {"text": "The assertion is false, but the reason is true", "correct": false, "explanation": ""}
-          ]
-        },
-        {
-          "question": "True/False statement goes here",
-          "type": "true-false",
-          "options": [
-            {"text": "True", "correct": true, "explanation": "Detailed explanation why this is true"},
-            {"text": "False", "correct": false, "explanation": ""}
-          ]
-        }
-        // More questions...
+      "question": "Question text here?",
+      "options": [
+        {"text": "Option A", "correct": false, "explanation": ""},
+        {"text": "Option B", "correct": true, "explanation": "Why this is correct"},
+        {"text": "Option C", "correct": false, "explanation": ""},
+        {"text": "Option D", "correct": false, "explanation": ""}
       ]
     }
-    
-    ${languageInstruction}
-    
-    The explanations should only be provided for correct answers. Make sure all JSON is properly formatted with no errors.`;
+  ]
+}
 
-    // Using Gemini API to generate the quiz
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: geminiPrompt }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 2500,
-        }
-      })
-    });
+Requirements:
+- ${numOptions} options per question
+- ${difficulty} difficulty level
+- Only ONE option should be correct
+- Provide explanation only for the correct answer
+- ${languageInstruction}
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Gemini API Error Response:", errorText);
-      console.error("Response status:", response.status);
-      console.error("Response headers:", Object.fromEntries(response.headers.entries()));
-      throw new Error(`Gemini API call failed with status: ${response.status} - ${errorText}`);
-    }
+Return ONLY the JSON object, no markdown or additional text.`;
 
-    const data = await response.json();
-    console.log("Gemini API Response Data:", data);
+    const generatedText = await callGeminiAPI(geminiPrompt);
+    console.log(" ========== RAW GEMINI RESPONSE ==========");
+    console.log(generatedText);
+    console.log("==========================================");
     
-    if (!data.candidates || data.candidates.length === 0) {
-      console.error("No candidates in Gemini response");
-      throw new Error("No candidates in Gemini response");
+    const quizData = safeParseJSON<any>(generatedText, null);
+    
+    if (quizData && quizData.questions && Array.isArray(quizData.questions)) {
+      console.log("✅ Successfully parsed quiz data");
+      return {
+        ...quizData,
+        difficulty
+      };
     }
     
-    const content = data.candidates[0].content.parts[0].text;
-    console.log("Raw Gemini content:", content);
+    console.warn("Failed to parse, using fallback");
+    return createFallbackQuiz(prompt, numQuestions);
     
-    try {
-      // Parse the JSON string to extract the quiz object
-      const jsonStart = content.indexOf('{');
-      const jsonEnd = content.lastIndexOf('}') + 1;
-      
-      if (jsonStart === -1 || jsonEnd === 0) {
-        console.error("Could not find valid JSON in Gemini response");
-        throw new Error("Invalid JSON response from Gemini");
-      }
-      
-      const jsonString = content.substring(jsonStart, jsonEnd);
-      
-      const quiz = JSON.parse(jsonString);
-      console.log("Parsed quiz data from Gemini:", quiz);
-      
-      // Add difficulty to the quiz data
-      quiz.difficulty = difficulty;
-      
-      return quiz;
-    } catch (err) {
-      console.error("Error parsing quiz JSON from Gemini:", err);
-      console.error("Content:", content);
-      throw new Error("Failed to parse Gemini response");
-    }
   } catch (error) {
-    console.error("Error generating quiz with Gemini:", error);
-    
-    // Fallback to OpenAI if Gemini fails
-    console.log("Falling back to OpenAI for quiz generation");
-    
-    try {
-      // Calculate number of each question type
-      const assertionReasonQuestions = Math.ceil(numQuestions * 0.2); // 20% assertion-reason
-      const trueFalseQuestions = Math.ceil(numQuestions * 0.1); // 10% true-false
-      const multipleChoiceQuestions = numQuestions - assertionReasonQuestions - trueFalseQuestions;
-
-      console.log("Using OpenAI fallback with key:", OPENAI_API_KEY ? 'Present' : 'Missing');
-
-      // Using OpenAI as fallback
-      const response = await fetch(OPENAI_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { 
-              role: 'system', 
-              content: `You are an expert AI Quiz Generator. Create a quiz based on the following topic or content. 
-              
-              The quiz should be ${difficultyOrLanguage} difficulty level with ${numQuestions} questions total, structured as follows:
-              
-              1. ${multipleChoiceQuestions} standard multiple-choice questions, each with ${numOptions} options
-              2. ${assertionReasonQuestions} assertion-reason questions (where you provide a statement and a reason, and the user must determine if both are true and if the reason correctly explains the assertion)
-              3. ${trueFalseQuestions} true-false questions
-              
-              For all question types:
-              - Only ONE option should be correct in multiple-choice questions
-              - Provide clear explanations for why the correct answer is right
-              - Make wrong answers plausible but clearly incorrect
-              
-              Format your response as a valid JSON object with this structure:
-              {
-                "questions": [
-                  {
-                    "question": "Multiple choice question text?",
-                    "type": "multiple-choice",
-                    "options": [
-                      {"text": "First option", "correct": false, "explanation": ""},
-                      {"text": "Second option", "correct": true, "explanation": "Detailed explanation why this is correct"},
-                      {"text": "Third option", "correct": false, "explanation": ""},
-                      {"text": "Fourth option", "correct": false, "explanation": ""}
-                    ]
-                  },
-                  {
-                    "question": "Assertion: [Your assertion statement]. Reason: [Your reason statement].",
-                    "type": "assertion-reason",
-                    "options": [
-                      {"text": "Both assertion and reason are true, and the reason correctly explains the assertion", "correct": false, "explanation": ""},
-                      {"text": "Both assertion and reason are true, but the reason does not explain the assertion", "correct": true, "explanation": "Detailed explanation"},
-                      {"text": "The assertion is true, but the reason is false", "correct": false, "explanation": ""},
-                      {"text": "The assertion is false, but the reason is true", "correct": false, "explanation": ""}
-                    ]
-                  },
-                  {
-                    "question": "True/False statement goes here",
-                    "type": "true-false",
-                    "options": [
-                      {"text": "True", "correct": true, "explanation": "Detailed explanation why this is true"},
-                      {"text": "False", "correct": false, "explanation": ""}
-                    ]
-                  }
-                  // More questions...
-                ]
-              }
-              
-              The explanations should only be provided for correct answers. Make sure all JSON is properly formatted with no errors.` 
-            },
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.7,
-          max_tokens: 2500
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("OpenAI API Error Response:", errorText);
-        throw new Error(`OpenAI API call failed with status: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      console.log("OpenAI API Response Data:", data);
-      
-      if (data.error) {
-        console.error("OpenAI API Error:", data.error);
-        throw new Error(`OpenAI API error: ${data.error.message || 'Unknown error'}`);
-      }
-      
-      if (!data.choices || data.choices.length === 0) {
-        console.error("No choices in OpenAI response");
-        throw new Error("No choices in OpenAI response");
-      }
-      
-      const content = data.choices[0].message.content;
-      console.log("Raw OpenAI content:", content);
-      
-      // Parse the JSON string to extract the quiz object
-      const jsonStart = content.indexOf('{');
-      const jsonEnd = content.lastIndexOf('}') + 1;
-      
-      if (jsonStart === -1 || jsonEnd === 0) {
-        console.error("Could not find valid JSON in OpenAI response");
-        throw new Error("Invalid JSON response from OpenAI");
-      }
-      
-      const jsonString = content.substring(jsonStart, jsonEnd);
-      
-      const quiz = JSON.parse(jsonString);
-      console.log("Parsed quiz data from OpenAI:", quiz);
-      
-      // Add difficulty to the quiz data
-      const isDifficulty = ['easy', 'medium', 'hard'].includes(difficultyOrLanguage);
-      const difficulty = isDifficulty ? difficultyOrLanguage as 'easy' | 'medium' | 'hard' : 'medium';
-      quiz.difficulty = difficulty;
-      
-      return quiz;
-    } catch (fallbackError) {
-      console.error("Error in OpenAI fallback:", fallbackError);
-      throw new Error(`Both Gemini and OpenAI failed: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`);
-    }
+    console.error("Error generating quiz:", error);
+    console.warn("Using fallback quiz due to error");
+    return createFallbackQuiz(prompt, numQuestions);
   }
 }

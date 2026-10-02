@@ -1,31 +1,33 @@
-// API Keys (in a real app, these should be environment variables)
-export const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY || 'sk-example-key-replace-with-your-own';
-export const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || 'AIzaSyAWFGHhI3vjvkjpzM70sDOBQsW_L5w5QdY';
+// API Keys - All keys must be provided via environment variables
+export const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+
+if (!GEMINI_API_KEY) {
+  console.warn('VITE_GEMINI_API_KEY is not set. AI features will not work.');
+}
 
 // API URLs
-export const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
-export const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+export const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
 // YouTube and RapidAPI Configuration
-export const YOUTUBE_API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY || 'your-youtube-api-key-here';
-export const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY || '88e9d73b57msh9982c179daafdb7efwfep1d1688jsn6d4186f6ca5a';
-export const RAPIDAPI_HOST = import.meta.env.VITE_RAPIDAPI_HOST || 'youtube-video-summarizer-gpt-ai.p.rapidapi.com';
-export const YOUTUBE_API_URL = 'https://www.googleapis.com/youtube/v3';
+export const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY;
+export const RAPIDAPI_HOST = import.meta.env.VITE_RAPIDAPI_HOST || 'youtube-transcript3.p.rapidapi.com';
 
-// Debug logging for development (moved after all constants are declared)
+if (!RAPIDAPI_KEY) {
+  console.warn('VITE_RAPIDAPI_KEY is not set. YouTube transcript features will not work.');
+}
+
+// Debug logging for development
 if (process.env.NODE_ENV === 'development') {
   console.log('Config loaded:');
   console.log('Gemini API Key:', GEMINI_API_KEY ? 'Present' : 'Missing');
-  console.log('OpenAI API Key:', OPENAI_API_KEY ? 'Present' : 'Missing');
   console.log('RapidAPI Key:', RAPIDAPI_KEY ? 'Present' : 'Missing');
   console.log('Gemini API URL:', GEMINI_API_URL);
-  console.log('OpenAI API URL:', OPENAI_API_URL);
 }
 
 // Model configurations
 export const AI_MODELS = {
-  quizGenerator: "gemini-1.5-flash", // Primary: Gemini, Fallback: OpenAI
-  teacherChat: "gemini-1.5-flash",
+  quizGenerator: "gemini-flash-latest",
+  teacherChat: "gemini-flash-latest",
 };
 
 // Quiz generation parameters

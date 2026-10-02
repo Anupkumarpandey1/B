@@ -22,28 +22,42 @@ export async function getVideoDetails(youtubeUrl: string): Promise<string | null
       return null;
     }
 
-    // Fetch transcript from Supadata API
-    const response = await fetch(`https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}`, {
-      method: 'GET',
-      headers: {
-        'x-api-key': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IjEifQ.eyJpc3MiOiJuYWRsZXMiLCJpYXQiOiIxNzQzNTc3NzMzIiwicHVycG9zZSI6ImFwaV9hdXRoZW50aWNhdGlvbiIsInN1YiI6ImUwZDBmMTM3YTYyYTRiYzA4NGRlMTdhMWViZmRjNWUwIn0.5wSvZVmp3s7VOTT8khMKyM3jk74wj0n2ud91o1MEwT4'
+    console.log("Fetching transcript for video ID:", videoId);
+
+    // Use the new YouTube Transcript API
+    const response = await fetch(
+      `https://${RAPIDAPI_HOST}/api/transcript-with-url?lang=en&flat_text=true&url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}`,
+      {
+        method: 'GET',
+        headers: {
+          'accept': 'application/json',
+          'x-rapidapi-host': RAPIDAPI_HOST,
+          'x-rapidapi-key': RAPIDAPI_KEY
+        }
       }
-    });
-    
+    );
+
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Transcript API error:', errorText);
       toast.error('Failed to fetch video transcript');
       return null;
     }
 
     const data = await response.json();
-    if (!data || !data.transcript || !Array.isArray(data.transcript) || data.transcript.length === 0) {
-      toast.error('No transcript available for this video');
-      return null;
+    console.log("Transcript API response:", data);
+
+    // Extract transcript text from response
+    if (data && data.transcript) {
+      return data.transcript;
+    } else if (data && data.text) {
+      return data.text;
+    } else if (typeof data === 'string') {
+      return data;
     }
 
-    // Join all transcript text
-    const fullText = data.transcript.map((entry: any) => entry.text).join(' ');
-    return fullText;
+    toast.error('No transcript available for this video');
+    return null;
   } catch (error) {
     console.error('Error fetching video details:', error);
     toast.error('Failed to fetch video transcript');
@@ -52,54 +66,16 @@ export async function getVideoDetails(youtubeUrl: string): Promise<string | null
 }
 
 export function getVideoSummary(youtubeUrl: string): Promise<string | null> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     try {
-      if (!youtubeUrl.includes('youtube.com/watch?v=') && !youtubeUrl.includes('youtu.be/')) {
-        toast.error('Please enter a valid YouTube URL');
-        return reject('Invalid YouTube URL');
+      const transcript = await getVideoDetails(youtubeUrl);
+      if (transcript) {
+        resolve(transcript);
+      } else {
+        reject('Failed to get transcript');
       }
-
-      // Extract video ID from URL
-      let videoId = '';
-      if (youtubeUrl.includes('youtube.com/watch?v=')) {
-        const urlObj = new URL(youtubeUrl);
-        videoId = urlObj.searchParams.get('v') || '';
-      } else if (youtubeUrl.includes('youtu.be/')) {
-        videoId = youtubeUrl.split('youtu.be/')[1].split('?')[0];
-      }
-
-      if (!videoId) {
-        toast.error('Could not extract video ID from URL');
-        return reject('Could not extract video ID');
-      }
-
-      console.log("Fetching summary for video ID:", videoId);
-
-      const data = null;
-      const xhr = new XMLHttpRequest();
-      xhr.withCredentials = true;
-
-      xhr.addEventListener('readystatechange', function () {
-        if (this.readyState === this.DONE) {
-          console.log("RapidAPI response:", this.responseText);
-          resolve(this.responseText);
-        }
-      });
-
-      xhr.addEventListener('error', function (error) {
-        console.error('XHR error:', error);
-        toast.error('Failed to fetch video summary');
-        reject('Failed to fetch video summary');
-      });
-
-      xhr.open('GET', `https://${RAPIDAPI_HOST}/api/v1/get-transcript-v2?video_id=${videoId}&platform=youtube`);
-      xhr.setRequestHeader('x-rapidapi-key', RAPIDAPI_KEY);
-      xhr.setRequestHeader('x-rapidapi-host', RAPIDAPI_HOST);
-
-      xhr.send(data);
     } catch (error) {
-      console.error('Error fetching video summary:', error);
-      toast.error('Failed to fetch video summary');
+      console.error('Error getting video summary:', error);
       reject(error);
     }
   });
@@ -118,17 +94,15 @@ export async function getProcessedSummary(rawApiResponse: string, language: 'eng
       if (apiData && apiData.transcript) {
         console.log("Found transcript in API response");
         transcript = apiData.transcript;
-      } else if (apiData && apiData.summary) {
-        console.log("Found summary in API response");
-        return formatSummaryWithGemini(apiData.summary, language);
-      } else {
-        // If no structured data found, use the raw response
-        console.log("No transcript or summary found in API response, using raw response");
+      } else if (apiData && apiData.text) {
+        console.log("Found text in API response");
+        transcript = apiData.text;
+      } else if (typeof apiData === 'string') {
         transcript = rawApiResponse;
       }
     } catch (e) {
       // If parsing fails, use the raw response
-      console.error('Error parsing API response:', e);
+      console.log('Using raw response as transcript');
       transcript = rawApiResponse;
     }
     
@@ -137,7 +111,6 @@ export async function getProcessedSummary(rawApiResponse: string, language: 'eng
     
     if (!formattedSummary) {
       toast.error("Failed to format summary with Gemini");
-      // Return the raw transcript as fallback
       return transcript;
     }
     
@@ -175,14 +148,14 @@ async function formatSummaryWithGemini(content: string, language: 'english' | 'h
     
     The response should be educational and clearly formatted.`;
 
-    console.log("Sending prompt to Gemini API:", prompt.substring(0, 100) + "...");
-    console.log("Using API URL:", GEMINI_API_URL);
-    console.log("API Key (first few chars):", GEMINI_API_KEY.substring(0, 10) + "...");
+    console.log("Sending prompt to Gemini API...");
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    // Use X-goog-api-key header as per the working curl command
+    const response = await fetch(GEMINI_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-goog-api-key': GEMINI_API_KEY
       },
       body: JSON.stringify({
         contents: [{

@@ -2,15 +2,19 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, arrayUnion, Timestamp } from "firebase/firestore";
 
-// Firebase configuration - these are public keys, so it's safe to include them in the client code
+// Firebase configuration - loaded from environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyDdxOWlF_HWMDfYHOXS5dL19N8_pFuT77E",
-  authDomain: "quiz-app-lovable.firebaseapp.com",
-  projectId: "quiz-app-lovable",
-  storageBucket: "quiz-app-lovable.appspot.com",
-  messagingSenderId: "412377112590",
-  appId: "1:412377112590:web:8b2d346f0f1c7d09f3f03a"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
+
+if (!firebaseConfig.apiKey) {
+  console.warn('Firebase API key not found. Firebase features will not work.');
+}
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);

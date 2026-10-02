@@ -1,7 +1,18 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Environment, PresentationControls } from '@react-three/drei';
 import * as THREE from 'three';
+
+// Check if WebGL is available
+const isWebGLAvailable = (): boolean => {
+  try {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    return context !== null;
+  } catch (e) {
+    return false;
+  }
+};
 
 // Improved 3D Pen Model Component
 const PenModel = () => {
@@ -166,8 +177,64 @@ const PenModel = () => {
   );
 };
 
-// Canvas Scene Component
+// Canvas Scene Component with WebGL error handling
 const PenScene = () => {
+  const [hasWebGL, setHasWebGL] = useState<boolean | null>(null);
+  const [webglError, setWebGLError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const available = isWebGLAvailable();
+    setHasWebGL(available);
+    if (!available) {
+      setWebGLError('WebGL is not available on this device/browser. The 3D model cannot be displayed.');
+    }
+  }, []);
+
+  // Show fallback if WebGL is not available
+  if (hasWebGL === false) {
+    return (
+      <div 
+        style={{ 
+          width: '100%', 
+          height: '400px', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          flexDirection: 'column',
+          gap: '1rem',
+          backgroundColor: 'rgba(30, 64, 175, 0.1)',
+          borderRadius: '1rem',
+          padding: '2rem'
+        }}
+      >
+        <div style={{ fontSize: '3rem', opacity: 0.5 }}>🖊️</div>
+        <p style={{ color: '#1E40AF', textAlign: 'center', margin: 0 }}>
+          3D model unavailable
+        </p>
+        <p style={{ color: '#64748B', textAlign: 'center', margin: 0, fontSize: '0.875rem' }}>
+          WebGL is disabled or not supported in this environment
+        </p>
+      </div>
+    );
+  }
+
+  // Don't render until we know WebGL status
+  if (hasWebGL === null) {
+    return (
+      <div 
+        style={{ 
+          width: '100%', 
+          height: '400px', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center'
+        }}
+      >
+        <p style={{ color: '#64748B' }}>Loading 3D model...</p>
+      </div>
+    );
+  }
+
   return (
     <Canvas
       shadows
@@ -175,6 +242,17 @@ const PenScene = () => {
       // Modified camera position to better show the tilted pen
       camera={{ position: [0, 0.5, 4], fov: 40 }}
       style={{ width: '100%', height: '400px', touchAction: 'none' }}
+      onCreated={({ gl }) => {
+        // Handle context loss
+        gl.domElement.addEventListener('webglcontextlost', (event) => {
+          event.preventDefault();
+          console.warn('WebGL context lost. The 3D model may not display correctly.');
+        });
+      }}
+      // Fallback for when WebGL context creation fails
+      fallback={<div style={{ width: '100%', height: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: '#64748B' }}>3D model could not be loaded</p>
+      </div>}
     >
       <ambientLight intensity={0.4} />
       <spotLight 

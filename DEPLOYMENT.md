@@ -50,12 +50,21 @@ vercel
 3. Add the following variables:
 
 ```
-VITE_GEMINI_API_KEY=AIzaSyAWFGHhI3vjvkjpzM70sDOBQsW_L5w5QdY
-VITE_OPENAI_API_KEY=your_openai_api_key_here
-VITE_SUPABASE_URL=https://wgyzldjujhebaezncefi.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndneXpsZGp1amhlYmFlem5jZWZpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM1MTMwODcsImV4cCI6MjA1OTA4OTA4N30.g5gKcsHmPlABZlJKe7A8Es2IqvHIOauEaZHYAMG9NsI
+VITE_GEMINI_API_KEY=your_gemini_api_key_here
+VITE_RAPIDAPI_KEY=your_rapidapi_key_here
+VITE_RAPIDAPI_HOST=youtube-transcript3.p.rapidapi.com
+VITE_SUPABASE_URL=your_supabase_url_here
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+VITE_FIREBASE_API_KEY=your_firebase_api_key_here
+VITE_FIREBASE_AUTH_DOMAIN=your_firebase_auth_domain
+VITE_FIREBASE_PROJECT_ID=your_firebase_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_firebase_storage_bucket
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_firebase_messaging_sender_id
+VITE_FIREBASE_APP_ID=your_firebase_app_id
 VITE_APP_ENV=production
 ```
+
+**Important:** Never commit actual API keys to your repository. Always use environment variables.
 
 ### 3.2 Redeploy After Adding Environment Variables:
 ```bash
