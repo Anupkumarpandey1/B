@@ -70,11 +70,11 @@ const UserProfile = () => {
   }, [user, loading, navigate]);
 
   useEffect(() => {
-    if (activeTab === "assessments" && user) {
+    if (user) {
       fetchUserAssessments();
       fetchUserLearnPoints();
     }
-  }, [activeTab, user]);
+  }, [user]);
   
   const fetchUserAssessments = async () => {
     setIsLoading(true);

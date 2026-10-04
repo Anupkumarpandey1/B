@@ -91,7 +91,7 @@ const QuizDisplay = ({ quiz, onReset, username, onScoreSubmit, creatorName }: Qu
     }
     
     if (username && onScoreSubmit) {
-      const quizResult = getQuizContext();
+      const quizResult = getQuizContext(correctCount);
       onScoreSubmit(correctCount, quiz.questions.length, quizResult);
       setScoreSubmitted(true);
     }
@@ -116,13 +116,14 @@ const QuizDisplay = ({ quiz, onReset, username, onScoreSubmit, creatorName }: Qu
 
   const handleSubmitScore = () => {
     if (score !== null && onScoreSubmit && !scoreSubmitted) {
-      const quizResult = getQuizContext();
+      const quizResult = getQuizContext(score);
       onScoreSubmit(score, quiz.questions.length, quizResult);
       setScoreSubmitted(true);
     }
   };
 
-  const getQuizContext = () => {
+  const getQuizContext = (overrideScore?: number | null) => {
+    const activeScore = overrideScore !== undefined ? overrideScore : score;
     const questionsWithAnswers = quiz.questions.map((q, qIndex) => {
       const selectedOption = selectedAnswers[qIndex];
       const isCorrect = selectedOption !== undefined ? q.options[selectedOption]?.correct : false;
@@ -139,11 +140,11 @@ const QuizDisplay = ({ quiz, onReset, username, onScoreSubmit, creatorName }: Qu
     
     return {
       totalQuestions: quiz.questions.length,
-      score: score,
+      score: activeScore,
       questions: questionsWithAnswers,
-      title: quiz.title,
+      title: quiz.title || quiz.topic || 'Assessment',
       difficulty: quiz.difficulty,
-      topic: quiz.topic
+      topic: quiz.topic || quiz.title
     };
   };
 

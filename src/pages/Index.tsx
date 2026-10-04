@@ -38,6 +38,7 @@ const Index = () => {
   const [liveLeaderboardVisible, setLiveLeaderboardVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showMasterChat, setShowMasterChat] = useState(false);
+  const [masterChatContext, setMasterChatContext] = useState<any>(null);
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
@@ -147,9 +148,15 @@ const Index = () => {
     setQuiz(null);
     setShowLeaderboard(false);
     setShowMasterChat(false);
+    setMasterChatContext(null);
   };
 
-  const handleScoreSubmit = async (score: number, totalQuestions: number) => {
+  const handleScoreSubmit = async (score: number, totalQuestions: number, quizResult?: any) => {
+    // Store quiz context (with wrong answers info) for MasterChat
+    if (quizResult) {
+      setMasterChatContext(quizResult);
+    }
+
     if (!username || !currentQuizId) {
       toast({
         title: "Error saving score",
@@ -380,7 +387,7 @@ const Index = () => {
                     {showMasterChat && (
                       <div className="md:hidden mt-6">
                         {liveLeaderboardVisible && (
-                          <MasterChat quizTopic={quiz?.questions[0]?.question.split(' ').slice(0, 5).join(' ')} />
+                          <MasterChat quizTopic={quiz?.questions[0]?.question.split(' ').slice(0, 5).join(' ')} quizContext={masterChatContext} />
                         )}
                       </div>
                     )}
@@ -397,7 +404,7 @@ const Index = () => {
               {quiz && showMasterChat && (
                 <div className="md:block">
                   <div className="sticky top-4 space-y-6">
-                    <MasterChat quizTopic={quiz?.questions[0]?.question.split(' ').slice(0, 5).join(' ')} />
+                    <MasterChat quizTopic={quiz?.questions[0]?.question.split(' ').slice(0, 5).join(' ')} quizContext={masterChatContext} />
                   </div>
                 </div>
               )}
