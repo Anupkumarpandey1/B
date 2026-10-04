@@ -4,10 +4,10 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/
 
 // Candidate models in order of stability
 const STABLE_GEMINI_MODELS = [
+  "gemini-3.8-flash",
+  "gemini-3.7-flash",
   "gemini-3.6-flash",
   "gemini-3.5-flash",
-  "gemini-3.7-flash",
-  "gemini-3.8-flash",
   "gemini-flash-latest",
   "gemini-pro-latest"
 ];

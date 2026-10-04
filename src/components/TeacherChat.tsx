@@ -4,10 +4,9 @@ import { motion } from 'framer-motion';
 import { FormattedMessage } from './FormattedMessage';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { generateQuiz } from '@/lib/openai';
+import { generateQuiz, callGeminiAPI } from '@/lib/openai';
 import { toast } from 'sonner';
 import QuizDisplay from './QuizDisplay';
-import { GEMINI_API_KEY } from '@/lib/config';
 
 interface ChatMessage {
   role: 'user' | 'bot';
@@ -31,8 +30,6 @@ interface TeacherChatProps {
   quizContext?: any;
 }
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
-
 const TeacherChat = ({ quizContext }: TeacherChatProps) => {
   const [inputMessage, setInputMessage] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -51,30 +48,7 @@ const TeacherChat = ({ quizContext }: TeacherChatProps) => {
 
   const getGeminiResponse = async (prompt: string): Promise<string> => {
     try {
-      const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{ text: prompt }],
-          }],
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
-      const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (!generatedText) {
-        throw new Error('No valid response from Gemini API');
-      }
-
-      return generatedText.trim();
+      return await callGeminiAPI(prompt);
     } catch (error) {
       console.error('Gemini API error:', error);
       throw error;

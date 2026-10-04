@@ -388,7 +388,7 @@ const Index = () => {
                 )}
               </div>
               
-              {!quiz && !showLeaderboard && user && (
+              {!quiz && !showLeaderboard && (
                 <div className="h-[600px] md:h-[800px]">
                   <TeacherChat quizContext={quiz && typeof getQuizContext === 'function' ? getQuizContext() : undefined} />
                 </div>

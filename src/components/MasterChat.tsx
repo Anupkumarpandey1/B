@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send } from 'lucide-react';
+import { Send, Loader2, Bot } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { callGeminiAPI } from '@/lib/openai';
+import { FormattedMessage } from './FormattedMessage';
+import { toast } from 'sonner';
 
 interface Message {
   id: string;
@@ -40,7 +42,10 @@ const MasterChat = ({ quizTopic, quizContext }: MasterChatProps) => {
   const [newMessage, setNewMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth();
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isTyping]);
 
   useEffect(() => {
     if (messages.length === 0) {
@@ -62,23 +67,25 @@ const MasterChat = ({ quizTopic, quizContext }: MasterChatProps) => {
               incorrectAnswersMessage += `Question ${q.questionNumber}: "${q.question}"\n`;
               incorrectAnswersMessage += `Your answer: "${q.userAnswer}"\n`;
               incorrectAnswersMessage += `Correct answer: "${q.correctAnswer}"\n`;
-              incorrectAnswersMessage += `${q.explanation || 'No explanation provided.'}\n\n`;
+              if (q.explanation) {
+                incorrectAnswersMessage += `Explanation: ${q.explanation}\n\n`;
+              }
             });
           }
         }
         
         initialMessage = {
           id: '1',
-          text: `Hi there! I'm your learning assistant. I see you've completed "${title}"${difficulty} with a score of ${score}/${total} (${percentage}%).${incorrectAnswersMessage}\nYou can ask me about any questions you got wrong or any concepts you'd like to understand better.`,
-          sender: 'ai' as const
+          text: `Hi there! I'm your Master Teacher. I see you've completed "${title}"${difficulty} with a score of ${score}/${total} (${percentage}%).${incorrectAnswersMessage}\nAsk me any questions about the concepts, why an answer was wrong, or anything you'd like to learn deeper!`,
+          sender: 'ai'
         };
       } else {
         initialMessage = {
           id: '1',
           text: quizTopic 
-            ? `Hi there! I'm your learning assistant. Ask me any questions about "${quizTopic}" or your recent assessment.` 
-            : "Hi there! I'm your learning assistant. How can I help you understand the topic better?",
-          sender: 'ai' as const
+            ? `Hi there! I'm your Master Teacher. Ask me any questions about "${quizTopic}" or your recent assessment.` 
+            : "Hi there! I'm your Master Teacher. How can I help you understand the topic better?",
+          sender: 'ai'
         };
       }
       
@@ -92,143 +99,86 @@ const MasterChat = ({ quizTopic, quizContext }: MasterChatProps) => {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!newMessage.trim() || !user) return;
+    const userPromptText = newMessage.trim();
+    if (!userPromptText || isTyping) return;
 
-    // Always add assessment context to user message if quizContext is present
-    let messageWithContext = newMessage;
-    if (quizContext) {
-      const contextSummary = `\n[Assessment Context]\nTitle: ${quizContext.title || 'Assessment'}\nScore: ${quizContext.score}/${quizContext.totalQuestions}\nQuestions: ${quizContext.questions.map(q => `\nQ${q.questionNumber}: ${q.question}\nYour answer: ${q.userAnswer}\nCorrect answer: ${q.correctAnswer}`).join('')}\n`;
-      messageWithContext = `${contextSummary}\n[User Question]\n${newMessage}`;
-    }
-    
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: newMessage,
+      text: userPromptText,
       sender: 'user'
     };
     
     setMessages(prev => [...prev, userMessage]);
     setNewMessage('');
     setIsTyping(true);
-    
-    setTimeout(() => {
+
+    try {
+      // Build full prompt context for Gemini
+      let promptContext = `You are "Master Teacher", an expert, empathetic, and encouraging AI tutor.
+Answer the user's question accurately, clearly, and concisely. Use bolding and bullet points where helpful.`;
+
+      if (quizTopic) {
+        promptContext += `\n\nTopic: ${quizTopic}`;
+      }
+
+      if (quizContext) {
+        promptContext += `\n\n[Assessment Context]`;
+        if (quizContext.title) promptContext += `\nTitle: ${quizContext.title}`;
+        if (quizContext.score !== null) promptContext += `\nScore: ${quizContext.score}/${quizContext.totalQuestions}`;
+        if (quizContext.questions && quizContext.questions.length > 0) {
+          promptContext += `\nQuestions Summary:`;
+          quizContext.questions.forEach(q => {
+            promptContext += `\nQ${q.questionNumber}: ${q.question} | User Answer: ${q.userAnswer} | Correct Answer: ${q.correctAnswer} | Result: ${q.isCorrect ? 'Correct' : 'Incorrect'}`;
+            if (q.explanation) promptContext += ` | Explanation: ${q.explanation}`;
+          });
+        }
+      }
+
+      // Add recent chat history for context
+      const recentHistory = messages.slice(-6).map(m => `${m.sender === 'user' ? 'Student' : 'Teacher'}: ${m.text}`).join('\n');
+      if (recentHistory) {
+        promptContext += `\n\n[Recent Chat History]\n${recentHistory}`;
+      }
+
+      promptContext += `\n\n[Student Question]\n${userPromptText}`;
+
+      const aiText = await callGeminiAPI(promptContext);
+
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: generateResponse(messageWithContext, quizTopic, quizContext),
+        text: aiText || "I'm sorry, I couldn't process that question right now. Please try asking again.",
         sender: 'ai'
       };
-      
+
       setMessages(prev => [...prev, aiResponse]);
-      setIsTyping(false);
-    }, 1500);
-  };
-
-  const generateResponse = (message: string, topic?: string, context?: QuizContext): string => {
-    const normalizedMessage = message.toLowerCase();
-    
-    const questionNumberMatch = normalizedMessage.match(/question\s*(\d+)|(\d+)(st|nd|rd|th)\s*question|(\d+)\s*answer/i);
-    if (questionNumberMatch && context) {
-      const questionNum = parseInt(
-        questionNumberMatch[1] || 
-        questionNumberMatch[2] || 
-        questionNumberMatch[4] || 
-        '0'
-      );
-      
-      const questionData = context.questions.find(q => q.questionNumber === questionNum);
-      
-      if (questionData) {
-        if (normalizedMessage.includes('wrong') || normalizedMessage.includes('incorrect') || 
-            normalizedMessage.includes('mistake') || normalizedMessage.includes('why')) {
-          
-          if (!questionData.isCorrect) {
-            return `For question ${questionNum}: "${questionData.question}", you answered "${questionData.userAnswer}" which was incorrect. The correct answer was "${questionData.correctAnswer}".\n\nDetailed explanation: ${questionData.explanation || 'No detailed explanation was provided for this question.'}\n\nA common mistake is to ${generateCommonMistake(questionData.question, questionData.userAnswer, questionData.correctAnswer)}. Remember that ${generateLearningPoint(questionData.question, questionData.correctAnswer)}.`;
-          } else {
-            return `Actually, you got question ${questionNum} correct! You answered "${questionData.userAnswer}" which was the right answer. ${questionData.explanation || ''}`;
-          }
+    } catch (error) {
+      console.error('Error generating AI response in MasterChat:', error);
+      toast.error('Failed to get response from AI. Please try again.');
+      setMessages(prev => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          text: "Sorry, I encountered an error while answering. Please try asking again!",
+          sender: 'ai'
         }
-        
-        return `Regarding question ${questionNum}: "${questionData.question}", the correct answer is "${questionData.correctAnswer}". ${questionData.explanation || ''}`;
-      }
+      ]);
+    } finally {
+      setIsTyping(false);
     }
-    
-    if ((normalizedMessage.includes('wrong answers') || normalizedMessage.includes('incorrect answers')) && context) {
-      const wrongAnswers = context.questions.filter(q => !q.isCorrect);
-      
-      if (wrongAnswers.length === 0) {
-        return "Great job! You didn't get any answers wrong on this assessment.";
-      }
-      
-      if (wrongAnswers.length === 1) {
-        const q = wrongAnswers[0];
-        return `You only got question ${q.questionNumber} wrong: "${q.question}". You answered "${q.userAnswer}" but the correct answer was "${q.correctAnswer}". ${q.explanation || ''}`;
-      }
-      
-      const wrongAnswersList = wrongAnswers.map(q => 
-        `Question ${q.questionNumber}: "${q.question}". You answered "${q.userAnswer}" but the correct answer was "${q.correctAnswer}". ${q.explanation || ''}`
-      ).join("\n\n");
-      
-      return `Here are the questions you got wrong:\n\n${wrongAnswersList}`;
-    }
-    
-    if ((normalizedMessage.includes('score') || normalizedMessage.includes('result') || 
-         normalizedMessage.includes('how did i do') || normalizedMessage.includes('how well did i do')) && context) {
-      const score = context.score || 0;
-      const total = context.totalQuestions;
-      const percentage = Math.round((score / total) * 100);
-      const difficultyText = context.difficulty ? ` on a ${context.difficulty} difficulty assessment` : '';
-      
-      if (percentage === 100) {
-        return `You got a perfect score! ${score} out of ${total} (${percentage}%)${difficultyText}. Excellent work!`;
-      } else if (percentage >= 80) {
-        return `You did very well! You scored ${score} out of ${total} (${percentage}%)${difficultyText}. Great job!`;
-      } else if (percentage >= 60) {
-        return `You scored ${score} out of ${total} (${percentage}%)${difficultyText}. Good effort, but there's room for improvement.`;
-      } else {
-        return `You scored ${score} out of ${total} (${percentage}%)${difficultyText}. Let's work on improving your understanding of this topic.`;
-      }
-    }
-    
-    if ((normalizedMessage.includes('what') || normalizedMessage.includes('topic') || 
-         normalizedMessage.includes('subject') || normalizedMessage.includes('about')) && 
-        normalizedMessage.includes('quiz') && context && context.topic) {
-      return `This assessment is about "${context.topic}". It was designed as a ${context.difficulty || 'medium'} difficulty test with ${context.totalQuestions} questions.`;
-    }
-    
-    if (normalizedMessage.includes('explain') || normalizedMessage.includes('understand')) {
-      const topicToUse = context?.topic || topic || 'this topic';
-      return `The key to understanding ${topicToUse} is breaking it down into manageable parts. Start by mastering the core principles, then build on that knowledge step by step.`;
-    }
-    
-    if (normalizedMessage.includes('tip') || normalizedMessage.includes('advice') || normalizedMessage.includes('help')) {
-      const topicToUse = context?.topic || topic || 'this topic';
-      return `Here's a helpful tip for ${topicToUse}: Try creating simple examples to test your understanding. Also, explaining the concept to someone else (even imaginary) can help solidify your knowledge.`;
-    }
-    
-    const topicToUse = context?.topic || topic || 'this topic';
-    return `That's a great question about ${topicToUse}! To fully understand it, focus on connecting new information with concepts you already know. Also, regular practice with varied examples will help reinforce your learning.`;
   };
-
-  const generateCommonMistake = (question: string, userAnswer: string, correctAnswer: string): string => {
-    return `misinterpret the key concepts involved in the question, which leads to selecting an answer that seems plausible but misses the core principle`;
-  };
-
-  const generateLearningPoint = (question: string, correctAnswer: string): string => {
-    return `focusing on the precise terminology and understanding the underlying principles is crucial for mastering this topic`;
-  };
-
-  if (!user) {
-    return null;
-  }
 
   return (
     <div className="bg-white rounded-xl border shadow-md overflow-hidden flex flex-col h-full">
-      <div className="p-4 bg-gradient-to-r from-primary/10 to-secondary/10 border-b">
-        <h3 className="font-semibold text-lg">Learning Master</h3>
-        <p className="text-sm text-gray-600">
-          {quizContext?.title ? `Ask about "${quizContext.title}"` : "Ask questions about your assessment"}
-        </p>
+      <div className="p-4 bg-gradient-to-r from-primary/10 to-secondary/10 border-b flex items-center gap-3">
+        <div className="p-2 rounded-lg bg-primary/10 text-primary">
+          <Bot size={20} />
+        </div>
+        <div>
+          <h3 className="font-semibold text-lg leading-tight">Master Teacher</h3>
+          <p className="text-xs text-gray-600">
+            {quizContext?.title ? `Ask about "${quizContext.title}"` : "Ask questions about your assessment"}
+          </p>
+        </div>
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -241,25 +191,26 @@ const MasterChat = ({ quizTopic, quizContext }: MasterChatProps) => {
           >
             <div
               className={cn(
-                "max-w-[80%] rounded-lg p-3",
+                "max-w-[85%] rounded-2xl p-4 shadow-sm",
                 message.sender === 'user'
-                  ? 'bg-gradient-to-r from-primary to-secondary text-white'
-                  : 'bg-gray-100 text-gray-800'
+                  ? 'bg-gradient-to-r from-primary to-secondary text-white rounded-tr-none'
+                  : 'bg-gray-100 text-gray-800 rounded-tl-none border border-gray-200'
               )}
             >
-              <p className="text-sm whitespace-pre-line">{message.text}</p>
+              {message.sender === 'user' ? (
+                <p className="text-sm whitespace-pre-wrap">{message.text}</p>
+              ) : (
+                <FormattedMessage content={message.text} className="text-sm text-gray-800" />
+              )}
             </div>
           </motion.div>
         ))}
         
         {isTyping && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 text-gray-800 rounded-lg p-3 max-w-[80%]">
-              <div className="flex space-x-2">
-                <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }}></div>
-              </div>
+            <div className="bg-gray-100 text-gray-800 rounded-2xl rounded-tl-none p-3 border border-gray-200 flex items-center gap-2">
+              <Loader2 className="animate-spin text-primary" size={16} />
+              <span className="text-xs text-gray-500 font-medium">Master Teacher is thinking...</span>
             </div>
           </div>
         )}
@@ -267,15 +218,21 @@ const MasterChat = ({ quizTopic, quizContext }: MasterChatProps) => {
         <div ref={messagesEndRef} />
       </div>
       
-      <form onSubmit={handleSendMessage} className="p-4 border-t flex gap-2">
+      <form onSubmit={handleSendMessage} className="p-4 border-t flex gap-2 bg-gray-50/50">
         <Input
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
-          placeholder="Ask a question..."
-          className="flex-1"
+          placeholder="Ask a question about the topic..."
+          className="flex-1 bg-white"
+          disabled={isTyping}
         />
-        <Button type="submit" size="icon" disabled={!newMessage.trim()} className="bg-primary hover:bg-primary/90">
-          <Send size={18} />
+        <Button 
+          type="submit" 
+          size="icon" 
+          disabled={!newMessage.trim() || isTyping} 
+          className="bg-primary hover:bg-primary/90 text-white shadow"
+        >
+          {isTyping ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
         </Button>
       </form>
     </div>
