@@ -3,7 +3,7 @@
 
 ## Project info
 
-**URL**: https://learnflow.dev/projects/85643353-92e8-442e-afc0-942271d23722
+**URL**: https://learnflowai1.vercel.app/
 
 ## How can I edit this code?
 
@@ -11,7 +11,7 @@ There are several ways of editing your application.
 
 **Use LearnFlow**
 
-Simply visit the [LearnFlow Project](https://learnflow.dev/projects/85643353-92e8-442e-afc0-942271d23722) and start prompting.
+Simply visit the [LearnFlow Project](https://learnflowai1.vercel.app/) and start prompting.
 
 Changes made via LearnFlow will be committed automatically to this repo.
 
@@ -63,9 +63,7 @@ This project is built with .
 
 ## How can I deploy this project?
 
-Simply open [LearnFlow](https://learnflow.dev/projects/85643353-92e8-442e-afc0-942271d23722) and click on Share -> Publish.
+Simply open [LearnFlow](https://learnflowai1.vercel.app/) and click on Share -> Publish.
 
-## I want to use a custom domain - is that possible?
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.learnflow.dev/tips-tricks/custom-domain/)
 # B
