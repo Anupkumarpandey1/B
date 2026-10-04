@@ -224,7 +224,7 @@ const QuizPage = () => {
               {showLeaderboard ? "Hide Leaderboard" : "Show Leaderboard"}
             </Button>
             <a 
-              href="https://quiznect-genius.lovable.app/"
+              href="https://a-rust-tau.vercel.app/"
               target="_blank"
               rel="noopener noreferrer"
             >
