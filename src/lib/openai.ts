@@ -1,4 +1,4 @@
-import { GEMINI_API_KEY } from './config';
+import { GEMINI_API_KEY, GROQ_API_KEY } from './config';
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
@@ -10,15 +10,93 @@ const STABLE_GEMINI_MODELS = [
   "gemini-3.6-flash",
 ];
 
-// Helper to make resilient Gemini API calls with automatic model fallback
-export const callGeminiAPI = async (prompt: string): Promise<string> => {
+// Helper to parse Groq response structure accurately
+const extractGroqText = (data: any): string | null => {
+  if (!data) return null;
+  if (typeof data === 'string') return data;
+
+  // 1. Groq /v1/responses format (data.output array)
+  if (Array.isArray(data.output)) {
+    for (const item of data.output) {
+      if (item.type === 'message' && Array.isArray(item.content)) {
+        for (const c of item.content) {
+          if (c.type === 'output_text' && c.text) return c.text;
+          if (c.text) return c.text;
+        }
+      }
+    }
+    for (const item of data.output) {
+      if (item.content && Array.isArray(item.content)) {
+        for (const c of item.content) {
+          if (c.type === 'output_text' && c.text) return c.text;
+        }
+      }
+    }
+  }
+
+  // 2. Standard OpenAI choices format
+  if (data.choices?.[0]?.message?.content) {
+    return data.choices[0].message.content;
+  }
+  if (data.choices?.[0]?.text) {
+    return data.choices[0].text;
+  }
+
+  // 3. String properties fallback
+  if (typeof data.output === 'string' && data.output.trim().length > 0) return data.output;
+  if (typeof data.response === 'string' && data.response.trim().length > 0) return data.response;
+
+  return null;
+};
+
+// Helper to make resilient Groq API calls (Groq Console API key)
+export const callGroqAPI = async (prompt: string): Promise<string> => {
+  const key = GROQ_API_KEY;
+
+  // 1. Try Groq responses endpoint requested by user (openai/gpt-oss-20b)
+  try {
+    console.log("Trying Groq responses API (/v1/responses)...");
+    const response = await fetch("https://api.groq.com/openai/v1/responses", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-oss-20b",
+        input: prompt,
+      }),
+    });
+
+    const data = await response.json();
+    console.log("Groq responses API raw data:", data);
+
+    if (response.ok) {
+      const text = extractGroqText(data);
+      if (text && text.trim().length > 0) {
+        console.log("✅ Groq responses API succeeded with output!");
+        return text;
+      }
+    }
+  } catch (err) {
+    console.warn("Groq responses endpoint error:", err);
+  }
+
+  // 2. Fallback to Gemini API if Groq fails
+  console.warn("Groq API failed. Falling back to Gemini API...");
+  return await fetchGeminiDirect(prompt);
+};
+
+
+// Internal Direct Gemini caller
+const fetchGeminiDirect = async (prompt: string): Promise<string> => {
   let lastError: any = null;
 
   for (const model of STABLE_GEMINI_MODELS) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
 
-      console.log(`Trying model: ${model}`);
+      console.log(`Trying Gemini model: ${model}`);
 
       const response = await fetch(url, {
         method: "POST",
@@ -32,23 +110,25 @@ export const callGeminiAPI = async (prompt: string): Promise<string> => {
       });
 
       const data = await response.json();
-      console.log(`Model ${model} response:`, data);
 
       if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-        console.log(`✅ Model ${model} succeeded`);
+        console.log(`✅ Gemini Model ${model} succeeded`);
         return data.candidates[0].content.parts[0].text;
       }
 
       lastError = new Error(data.error?.message || `Model ${model} returned status ${response.status}`);
-      console.warn(`Model ${model} warning (${response.status}):`, data.error?.message || response.statusText);
     } catch (err) {
       lastError = err;
-      console.warn(`Fetch error for model ${model}:`, err);
     }
   }
 
-  throw lastError || new Error("Failed to communicate with Gemini API across all candidate models.");
+  throw lastError || new Error("Failed to communicate with AI API.");
 };
+
+// Export primary call function (defaults to Groq with Gemini fallback)
+export const callGeminiAPI = callGroqAPI;
+export const callAIAPI = callGroqAPI;
+
 
 // Helper to safely extract and parse JSON from AI responses
 export const safeParseJSON = <T>(text: string, fallback: T): T => {

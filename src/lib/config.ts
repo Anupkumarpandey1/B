@@ -1,9 +1,11 @@
 // API Keys - All keys must be provided via environment variables
 export const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+export const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
 
 if (!GEMINI_API_KEY) {
-  console.warn('VITE_GEMINI_API_KEY is not set. AI features will not work.');
+  console.warn('VITE_GEMINI_API_KEY is not set. AI features will fallback if needed.');
 }
+
 
 // API URLs
 export const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
