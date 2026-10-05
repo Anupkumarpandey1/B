@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
-  envPrefix: ['', 'VITE_'],
+  envPrefix: ['VITE_', 'GROQ_', 'GEMINI_', 'RAPIDAPI_', 'SUPABASE_', 'FIREBASE_', 'APP_'],
 
   plugins: [
     react(),
