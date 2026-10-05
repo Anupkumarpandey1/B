@@ -66,7 +66,26 @@ const Index = () => {
     };
     
     checkForSharedQuiz();
-  }, [location, navigate, toast]);
+  }, [location.search, navigate, toast]);
+
+  // Handle "Create Quiz" / "Get Started" navigation from Navbar
+  useEffect(() => {
+    const state = location.state as { openQuizSection?: boolean } | null;
+    if (state?.openQuizSection) {
+      // Clear the state so it doesn't re-trigger on re-renders
+      navigate(location.pathname, { replace: true, state: {} });
+      if (user) {
+        setShowQuizSection(true);
+        // Auto-fill username from user email
+        const displayName = user.email?.split('@')[0] || "Anonymous";
+        setUsername(displayName);
+        setUsernameRequired(false);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        navigate('/auth');
+      }
+    }
+  }, [location.state, user, navigate]);
 
   useEffect(() => {
     if (!currentQuizId) return;

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, LogOut, User, Sparkles, Zap } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,7 +55,7 @@ const Navbar = () => {
 
   const handleGetStarted = () => {
     if (user) {
-      navigate('/quiz-generator');
+      navigate('/', { state: { openQuizSection: true } });
     } else {
       navigate('/auth');
     }
@@ -339,13 +339,15 @@ const Navbar = () => {
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.3 }}
                       >
-                        <Link
-                          to="/quiz-generator"
-                          onClick={() => setMobileMenuOpen(false)}
-                          className="text-lg font-medium text-gray-700 hover:text-violet-600 py-3 px-4 rounded-xl hover:bg-violet-50 transition-colors block"
+                        <button
+                          onClick={() => {
+                            setMobileMenuOpen(false);
+                            navigate('/', { state: { openQuizSection: true } });
+                          }}
+                          className="text-lg font-medium text-gray-700 hover:text-violet-600 py-3 px-4 rounded-xl hover:bg-violet-50 transition-colors block text-left w-full"
                         >
                           Assessment Generator
-                        </Link>
+                        </button>
                       </motion.div>
 
                       <motion.div
@@ -395,7 +397,7 @@ const Navbar = () => {
                       <Button
                         onClick={() => {
                           setMobileMenuOpen(false);
-                          navigate('/quiz-generator');
+                          navigate('/', { state: { openQuizSection: true } });
                         }}
                         className="w-full premium-button py-6"
                       >

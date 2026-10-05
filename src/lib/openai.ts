@@ -2,26 +2,24 @@ import { GEMINI_API_KEY } from './config';
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
-// Candidate models in order of stability
+// Candidate models in order of stability (only confirmed valid model IDs)
 const STABLE_GEMINI_MODELS = [
+  "gemini-flash-latest",
   "gemini-3.8-flash",
   "gemini-3.7-flash",
   "gemini-3.6-flash",
-  "gemini-3.5-flash",
-  "gemini-flash-latest",
-  "gemini-pro-latest"
 ];
 
 // Helper to make resilient Gemini API calls with automatic model fallback
 export const callGeminiAPI = async (prompt: string): Promise<string> => {
   let lastError: any = null;
-  
+
   for (const model of STABLE_GEMINI_MODELS) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-      
+
       console.log(`Trying model: ${model}`);
-      
+
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -32,15 +30,15 @@ export const callGeminiAPI = async (prompt: string): Promise<string> => {
           contents: [{ parts: [{ text: prompt }] }]
         })
       });
-      
+
       const data = await response.json();
       console.log(`Model ${model} response:`, data);
-      
+
       if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
         console.log(`✅ Model ${model} succeeded`);
         return data.candidates[0].content.parts[0].text;
       }
-      
+
       lastError = new Error(data.error?.message || `Model ${model} returned status ${response.status}`);
       console.warn(`Model ${model} warning (${response.status}):`, data.error?.message || response.statusText);
     } catch (err) {
@@ -48,25 +46,25 @@ export const callGeminiAPI = async (prompt: string): Promise<string> => {
       console.warn(`Fetch error for model ${model}:`, err);
     }
   }
-  
+
   throw lastError || new Error("Failed to communicate with Gemini API across all candidate models.");
 };
 
 // Helper to safely extract and parse JSON from AI responses
 export const safeParseJSON = <T>(text: string, fallback: T): T => {
   if (!text) return fallback;
-  
+
   // Clean markdown block wrappers if present
   let cleanText = text.trim();
   if (cleanText.startsWith('```')) {
     cleanText = cleanText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
   }
-  
+
   // 1. Try direct parse
   try {
     return JSON.parse(cleanText);
   } catch (_) { }
-  
+
   // 2. Try extracting JSON array [ ... ]
   const arrayStart = cleanText.indexOf('[');
   const arrayEnd = cleanText.lastIndexOf(']');
@@ -77,7 +75,7 @@ export const safeParseJSON = <T>(text: string, fallback: T): T => {
       console.warn("Array JSON extraction failed:", e);
     }
   }
-  
+
   // 3. Try extracting JSON object { ... }
   const objStart = cleanText.indexOf('{');
   const objEnd = cleanText.lastIndexOf('}');
@@ -88,7 +86,7 @@ export const safeParseJSON = <T>(text: string, fallback: T): T => {
       console.warn("Object JSON extraction failed:", e);
     }
   }
-  
+
   return fallback;
 };
 
@@ -98,19 +96,19 @@ export async function checkAPIHealth(): Promise<{ gemini: boolean; errors: strin
   let geminiHealthy = false;
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
-    
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${GEMINI_API_KEY}`;
+
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
-        'X-goog-api-key': GEMINI_API_KEY 
+        'X-goog-api-key': GEMINI_API_KEY
       },
       body: JSON.stringify({
         contents: [{ parts: [{ text: 'Test message' }] }]
       })
     });
-    
+
     if (response.ok) {
       geminiHealthy = true;
       console.log('✅ Gemini API is healthy');
@@ -214,7 +212,7 @@ export async function processExtractedText(extractedText: string, language: 'eng
 const createFallbackQuiz = (text: string, numQuestions: number): QuizData => {
   const topic = text.trim();
   const title = topic.length > 30 ? topic.substring(0, 30) + "..." : topic;
-  
+
   return {
     questions: Array.from({ length: numQuestions }, (_, i) => ({
       question: `Which statement accurately describes core principle #${i + 1} of ${title}?`,
@@ -230,8 +228,8 @@ const createFallbackQuiz = (text: string, numQuestions: number): QuizData => {
 };
 
 export async function generateQuiz(
-  prompt: string, 
-  numQuestions: number = 5, 
+  prompt: string,
+  numQuestions: number = 5,
   numOptions: number = 4,
   difficultyOrLanguage: 'easy' | 'medium' | 'hard' | 'english' | 'hindi' | 'hinglish' = 'medium'
 ): Promise<QuizData | null> {
@@ -239,7 +237,7 @@ export async function generateQuiz(
     const isDifficulty = ['easy', 'medium', 'hard'].includes(difficultyOrLanguage);
     const difficulty = isDifficulty ? difficultyOrLanguage as 'easy' | 'medium' | 'hard' : 'medium';
     const language = !isDifficulty ? difficultyOrLanguage : 'english';
-    
+
     let languageInstruction = '';
     if (language === 'hindi') {
       languageInstruction = 'Generate the quiz in Hindi language.';
@@ -280,9 +278,9 @@ Return ONLY the JSON object, no markdown or additional text.`;
     console.log(" ========== RAW GEMINI RESPONSE ==========");
     console.log(generatedText);
     console.log("==========================================");
-    
+
     const quizData = safeParseJSON<any>(generatedText, null);
-    
+
     if (quizData && quizData.questions && Array.isArray(quizData.questions)) {
       console.log("✅ Successfully parsed quiz data from Gemini API");
       return {
@@ -290,9 +288,9 @@ Return ONLY the JSON object, no markdown or additional text.`;
         difficulty
       };
     }
-    
+
     throw new Error("Failed to parse quiz response from Gemini API.");
-    
+
   } catch (error) {
     console.error("Error generating quiz:", error);
     throw error;
