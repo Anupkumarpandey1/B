@@ -1,9 +1,9 @@
 // API Keys - All keys must be provided via environment variables
-export const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-export const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
+export const GEMINI_API_KEY = import.meta.env.GEMINI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+export const GROQ_API_KEY = import.meta.env.GROQ_API_KEY || import.meta.env.VITE_GROQ_API_KEY || '';
 
 if (!GEMINI_API_KEY) {
-  console.warn('VITE_GEMINI_API_KEY is not set. AI features will fallback if needed.');
+  console.warn('GEMINI_API_KEY is not set. AI features will fallback if needed.');
 }
 
 
@@ -11,11 +11,11 @@ if (!GEMINI_API_KEY) {
 export const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
 // YouTube and RapidAPI Configuration
-export const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY;
-export const RAPIDAPI_HOST = import.meta.env.VITE_RAPIDAPI_HOST || 'youtube-transcript3.p.rapidapi.com';
+export const RAPIDAPI_KEY = import.meta.env.RAPIDAPI_KEY || import.meta.env.VITE_RAPIDAPI_KEY;
+export const RAPIDAPI_HOST = import.meta.env.RAPIDAPI_HOST || import.meta.env.VITE_RAPIDAPI_HOST || 'youtube-transcript3.p.rapidapi.com';
 
 if (!RAPIDAPI_KEY) {
-  console.warn('VITE_RAPIDAPI_KEY is not set. YouTube transcript features will not work.');
+  console.warn('RAPIDAPI_KEY is not set. YouTube transcript features will not work.');
 }
 
 // Debug logging for development

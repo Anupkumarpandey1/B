@@ -10,6 +10,8 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
+  envPrefix: ['', 'VITE_'],
+
   plugins: [
     react(),
     mode === 'development' && componentTagger(),
